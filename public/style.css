@@ -52,6 +52,7 @@ main:focus {outline:none}
 .padded {padding:clamp(17px,3vw,29px)}
 .hero {display:grid;grid-template-columns:1.15fr 1fr;border-radius:25px;overflow:hidden;background:#2a2e22;border:1px solid #444935;color:#fbf2e1;min-height:380px}
 .hero-copy {padding:clamp(29px,5vw,69px) clamp(24px,5vw,65px);align-self:center}
+.hero-copy h1 {font-size:clamp(2.1rem,3.8vw,3.25rem)}
 .hero-copy .kicker {color:#c8d1ab;margin-bottom:15px}
 .hero-copy p {color:#d5d1c0;max-width:390px;margin:19px 0 25px}
 .hero-copy .btn.ghost {--ink:#f5efe1;--line:#60644f;--raised:#3b4131}
@@ -225,7 +226,7 @@ dialog .detail-body {margin-top:15px}
   .nav-inner a .icon {width:20px;height:20px}
   .hero {grid-template-columns:1fr;min-height:0}
   .hero-copy {padding:25px 19px}
-  .hero-copy h1 {font-size:clamp(2.65rem,10vw,3.75rem)}
+  .hero-copy h1 {font-size:clamp(1.8rem,7vw,2.5rem)}
   .hero-copy p {margin:12px 0 17px}
   .hero-copy .kicker {margin-bottom:9px}
   .hero-copy .btn {font-size:.82rem;padding-inline:10px}
