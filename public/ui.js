@@ -43,11 +43,16 @@ export const heading = (title,description='',actions='') =>
 export const empty = (title,description,actions='') =>
   '<div class="empty panel">'+icon('bowl')+'<h3>'+h(title)+'</h3><p>'+h(description)+'</p>'+actions+'</div>';
 export const dateLabel = value => new Date(value).toLocaleString('ru-RU',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
-export const artIndex = value => /^dish:(?:[0-9]|1[0-9])$/.test(value ?? '') ? +value.slice(5) : -1;
+export const artIndex = value => /^dish:(?:[0-9]|[1-6][0-9])$/.test(value ?? '') ? +value.slice(5) : -1;
 export const safePhoto = value => /^data:image\/(?:jpeg|png|webp);base64,/.test(value ?? '') ? value : '';
 export function photo(value,alt='',variant='') {
   const index=artIndex(value);
-  if (index>=0) return '<div class="photo '+variant+'" aria-hidden="true"><div class="tile"><img src="./images/dishes.jpg" alt="" style="--col:'+index%4+';--row:'+Math.floor(index/4)+'"></div></div>';
+  if (index>=0) {
+    const size=index<20?4:5;
+    const slot=index<20?index:(index-20)%25;
+    const board=index<20?'dishes':index<45?'dishes-21-45':'dishes-46-70';
+    return '<div class="photo '+variant+'" aria-hidden="true"><div class="tile"><img src="./images/'+board+'.jpg" alt="" style="--cols:'+size+';--col:'+slot%size+';--row:'+Math.floor(slot/size)+'"></div></div>';
+  }
   if (safePhoto(value)) return '<div class="photo '+variant+'"><img class="local-photo" src="'+h(value)+'" alt="'+h(alt)+'"></div>';
   return '<div class="photo no-photo '+variant+'">'+icon('bowl')+'</div>';
 }

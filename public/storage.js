@@ -22,7 +22,7 @@ export async function openStorage() {
       const request = store.get('state');
       request.onsuccess = () => {
         try {
-          result = operate(request.result ?? initialState());
+          result = operate({...initialState(), ...request.result});
           if (mode === 'readwrite') store.put(result,'state');
         } catch (failure) {
           error = failure;

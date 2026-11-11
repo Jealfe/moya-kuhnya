@@ -50,7 +50,7 @@
     "image": {
       "type": "string",
       "maxLength": 3000000,
-      "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+      "pattern": "^(?:$|dish:(?:[0-9]|[1-6][0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
     },
     "ingredients": {
       "type": "array",
@@ -211,6 +211,27 @@
       },
       "minItems": 0,
       "maxItems": 25
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "^https://[^\\s]+$"
+        }
+      },
+      "required": [
+        "title",
+        "url"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

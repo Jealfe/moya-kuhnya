@@ -1,4 +1,4 @@
-import { addShopping, amount, changeTimer, duration, parseBackup, parseRecipes, remaining, scaled, sessionFor, uid } from './core.js';
+import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { area, button, clock, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
 import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, settingsPage, shoppingPage, timerCard } from './pages.js';
@@ -273,14 +273,14 @@ async function onAction(action,id) {
       break;
     case 'plan': await change(current=>{current.planned=current.planned===id?null:id;}); say(state.planned?'Добавлено в план':'Убрано из плана'); break;
     case 'recipe-shop':
-      await change(current=>{current.shopping=addShopping(current.shopping,scaled(recipe.ingredients,getPortions(recipe),recipe.servings));});
-      say('Продукты добавлены в покупки');
+      await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
+      say('Блюдо добавлено отдельным списком');
       return;
     case 'export-recipe': saveFile(id+'.json',recipe); return;
     case 'export-all': saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
     case 'import': fileDialog('import'); return;
     case 'restore': fileDialog('restore'); return;
-    case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:1,created:Date.now(),data:await storage.read()}); return;
+    case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
     case 'restore-confirm':
       state=await storage.change(()=>restoreData);
       restoreData=null;
@@ -288,11 +288,26 @@ async function onAction(action,id) {
       say('Данные восстановлены');
       break;
     case 'shop-add': shopDialog(); return;
-    case 'shop-edit': shopDialog(state.shopping.find(item=>item.id===id)); return;
-    case 'shop-delete': await change(current=>{current.shopping=current.shopping.filter(item=>item.id!==id);}); break;
-    case 'shop-home': await change(current=>{const item=current.shopping.find(item=>item.id===id); if(item) item.state=item.state==='home'?'todo':'home';}); break;
+    case 'shop-edit': {
+      const item=findShoppingList(state,id)?.find(item=>item.id===id);
+      if (item) shopDialog(item);
+      return;
+    }
+    case 'shop-delete': await change(current=>removeShoppingItem(current,id)); break;
+    case 'shop-batch-delete':
+      await change(current=>{current.shoppingBatches=current.shoppingBatches.filter(batch=>batch.id!==id);});
+      say('Блюдо удалено из покупок');
+      break;
+    case 'shop-home':
+      await change(current=>{
+        const item=findShoppingList(current,id)?.find(item=>item.id===id);
+        if (item) item.state=item.state==='home'?'todo':'home';
+      });
+      break;
     case 'shop-copy': {
-      const list=state.shopping.map(item=>(item.state==='bought'?'✓ ':item.state==='home'?'Есть дома · ':'• ')+item.name+' — '+amount(item)).join('\n');
+      const list=shoppingSections(state).map(section=>[section.name+(section.id?' (порций: '+section.servings+')':''),
+        ...section.items.map(item=>(item.state==='bought'?'✓ ':item.state==='home'?'Есть дома · ':'• ')+item.name+' — '+amount(item))
+      ].join('\n')).join('\n\n');
       try {await navigator.clipboard.writeText(list); say('Список скопирован');}
       catch {showDialog('Список покупок',area('copy',list,'readonly rows="9" aria-label="Список покупок"'));}
       return;
@@ -356,7 +371,7 @@ document.addEventListener('change',event=>{
       await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value}];});
       say('Статус сохранён');
     } else if (target.dataset.item) {
-      await change(current=>{const item=current.shopping.find(item=>item.id===target.dataset.item); if(item) item.state=target.checked?'bought':'todo';});
+      await change(current=>{const item=findShoppingList(current,target.dataset.item)?.find(item=>item.id===target.dataset.item); if(item) item.state=target.checked?'bought':'todo';});
       render();
     } else if (['theme','sound','wake'].includes(target.name)) {
       await change(current=>{current.settings[target.name]=target.type==='checkbox'?target.checked:target.value;});
@@ -412,8 +427,8 @@ document.addEventListener('submit',event=>{
         return;
       }
       case 'restore-file': {
-        restoreData=parseBackup(await readJson(form.elements.file.files[0],256),exchange.backup);
-        const summary='Рецептов: '+restoreData.recipes.length+' · Записей дневника: '+restoreData.history.length+' · Покупок: '+restoreData.shopping.length+'.';
+        restoreData=parseBackup(await readJson(form.elements.file.files[0],256),exchange.backup,exchange.legacyBackup);
+        const summary='Рецептов: '+restoreData.recipes.length+' · Записей дневника: '+restoreData.history.length+' · Покупок: '+shoppingSections(restoreData).reduce((sum,section)=>sum+section.items.length,0)+'.';
         confirmAction('Заменить локальные данные?',summary+' Существующие данные этого приложения будут заменены содержимым копии.','Восстановить данные','restore-confirm');
         return;
       }
@@ -421,9 +436,14 @@ document.addEventListener('submit',event=>{
         const item={id:data.get('id')||uid(),name:data.get('name').trim(),quantity:+data.get('quantity'),unit:data.get('unit').trim(),group:data.get('group').trim(),state:'todo'};
         if (!item.name||!item.unit||!item.group) throw Error('Заполните название, единицу и группу.');
         await change(current=>{
-          const existing=current.shopping.find(record=>record.id===item.id);
-          if(existing) Object.assign(existing,{...item,state:existing.state});
-          else current.shopping.push(item);
+          if (!data.get('id')) {
+            if (current.shopping.length>=10000) throw Error('В общем списке уже 10000 продуктов.');
+            current.shopping.push(item);
+            return;
+          }
+          const existing=findShoppingList(current,item.id)?.find(record=>record.id===item.id);
+          if (!existing) throw Error('Этот продукт уже удалён.');
+          Object.assign(existing,{...item,state:existing.state});
         });
         break;
       }

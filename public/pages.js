@@ -1,4 +1,4 @@
-import { activity, amount, duration, formatNumber, ordered, remaining, scaled, statistics, totalTime } from './core.js';
+import { activity, amount, duration, formatNumber, ordered, remaining, scaled, shoppingSections, statistics, totalTime } from './core.js';
 import { area, button, card, clock, dateLabel, empty, field, foodList, h, heading, icon, input, link, list, photo, ratingLabel, select, stat, statusFor, statusLabels } from './ui.js';
 
 const start = recipe => button('Начать готовить','start',{id:recipe.id,kind:'primary',symbol:'arrow'});
@@ -58,7 +58,8 @@ export function recipePage(state,recipe,servings,preview=false) {
     (preview?'<span>'+servings+' порций</span>':field('Порций',input('servings',servings,'type="number" min="1" max="100" inputmode="numeric" data-id="'+h(recipe.id)+'"')))+
     '</div>'+foodList(scaled(recipe.ingredients,servings,recipe.servings))+'<h3>Что понадобится</h3>'+list(recipe.tools)+'</section>'+
     '<section class="panel padded"><h2>План приготовления</h2><ol class="steps">'+recipe.steps.map(step=>'<li><details><summary>'+h(step.title)+'</summary><p>'+h(step.instruction)+'</p>'+(step.temperature?'<p class="muted">'+h(step.temperature)+'</p>':'')+'</details></li>').join('')+'</ol>'+
-    (recipe.tips.length?'<h3>Советы</h3>'+list(recipe.tips):'')+(recipe.mistakes.length?'<h3>Частые ошибки</h3>'+list(recipe.mistakes):'')+'</section></div>'+
+    (recipe.tips.length?'<h3>Советы</h3>'+list(recipe.tips):'')+(recipe.mistakes.length?'<h3>Частые ошибки</h3>'+list(recipe.mistakes):'')+
+    (recipe.source?'<p class="recipe-source">Источник для сверки · <a href="'+h(recipe.source.url)+'" target="_blank" rel="noopener noreferrer">'+h(recipe.source.title)+'</a></p>':'')+'</section></div>'+
     (history.length&&!preview?'<section class="panel padded"><div class="section-heading"><h2>Последние заметки</h2>'+link('Сравнить попытки','history/'+recipe.id,{kind:'quiet'})+'</div>'+notes(history[0])+(notes(history[0])?'':'<p class="muted">К последней попытке заметок нет.</p>')+'</section>':'');
 }
 
@@ -114,20 +115,27 @@ function reportPage(session) {
     '<div class="actions"><button class="btn primary">Сохранить в дневник</button>'+button('Вернуться к шагам','report-back')+'</div></form>';
 }
 
-export function shoppingPage(state) {
+function shoppingGroups(items) {
   const groups=new Map();
-  for (const item of state.shopping) {
+  for (const item of items) {
     if (!groups.has(item.group)) groups.set(item.group,[]);
     groups.get(item.group).push(item);
   }
-  const count=state.shopping.filter(item=>item.state==='todo').length;
-  return heading('Покупки',state.shopping.length?'Осталось купить: '+count:'Соберите продукты из рецептов или добавьте свои.',
-    button('Добавить продукт','shop-add',{kind:'primary',symbol:'plus'})+button('Копировать','shop-copy',{disabled:!state.shopping.length}))+
-    (!state.shopping.length?empty('Список пока пуст','Откройте рецепт и добавьте продукты в покупки.',link('К рецептам','recipes',{kind:'primary'})):
-    [...groups].map(([group,items])=>'<section class="panel padded shopping-group"><h2>'+h(group)+'</h2>'+items.map(item=>
+  return [...groups].map(([group,entries])=>'<div class="shopping-category"><h3>'+h(group)+'</h3>'+entries.map(item=>
       '<div class="shopping-row '+(item.state!=='todo'?'checked':'')+'"><label><input type="checkbox" data-item="'+h(item.id)+'" '+(item.state==='bought'?'checked':'')+'><span><strong>'+h(item.name)+'</strong><small>'+h(amount(item))+(item.state==='home'?' · Уже дома':'')+'</small></span></label><div class="actions">'+
       button(item.state==='home'?'В покупки':'Есть дома','shop-home',{id:item.id,kind:item.state==='home'?'active':''})+
-      button('Изменить','shop-edit',{id:item.id,kind:'quiet'})+button('Удалить','shop-delete',{id:item.id,kind:'quiet danger'})+'</div></div>').join('')+'</section>').join(''));
+      button('Изменить','shop-edit',{id:item.id,kind:'quiet'})+button('Удалить','shop-delete',{id:item.id,kind:'quiet danger'})+'</div></div>').join('')+'</div>').join('');
+}
+export function shoppingPage(state) {
+  const sections=shoppingSections(state);
+  const count=sections.flatMap(section=>section.items).filter(item=>item.state==='todo').length;
+  return heading('Покупки',sections.length?'Осталось купить: '+count:'Добавьте продукты из рецепта или внесите свои.',
+    button('Добавить продукт','shop-add',{kind:'primary',symbol:'plus'})+button('Копировать','shop-copy',{disabled:!sections.length}))+
+    (!sections.length?empty('Список пока пуст','Откройте рецепт и добавьте продукты в покупки.',link('К рецептам','recipes',{kind:'primary'})):
+    sections.map(section=>'<section class="panel padded shopping-group"><div class="section-heading"><div><h2>'+h(section.name)+'</h2>'+
+      (section.id?'<p class="muted">Порций: '+section.servings+'</p>':'<p class="muted">Отдельные продукты</p>')+'</div>'+
+      (section.id?button('Удалить блюдо','shop-batch-delete',{id:section.id,kind:'quiet danger'}):'')+'</div>'+
+      shoppingGroups(section.items)+'</section>').join(''));
 }
 
 export const goalLabels = {monthly:'Приготовлений за месяц',new:'Новых блюд за месяц',retry:'Повторить неудачные блюда'};
@@ -141,7 +149,7 @@ export function historyPage(state,recipeId,period) {
     heading(recipeId?(entries[0]?.name??'Попытки'):'Кулинарный дневник',recipeId?'Сравните оценки, фотографии и заметки.':'Следите за практикой и сохраняйте наблюдения.',
       recipeId?'':button('Настроить цели','goals',{symbol:'trend'}))+
     (recipeId?'':'<div class="stats four">'+stat('Всего',stats.total,'bowl')+stat('Уникальных блюд',stats.unique,'recipes')+stat('Повторных попыток',stats.repeats,'history')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div>'+
-      '<div class="duo"><section class="panel padded"><div class="section-heading"><h2>Активность</h2>'+select('period',[['week','По неделям'],['month','По месяцам']],period,'aria-label="Период активности"')+'</div><div class="chart">'+points.map(point=>'<div><strong>'+point.count+'</strong><span class="bar" style="--bar:'+Math.max(3,point.count/chartMax*100)+'%"></span><small>'+h(point.label)+'</small></div>').join('')+'</div></section>'+
+      '<div class="duo"><section class="panel padded"><div class="section-heading activity-heading"><h2>Активность</h2>'+select('period',[['week','По неделям'],['month','По месяцам']],period,'aria-label="Период активности"')+'</div><div class="chart">'+points.map(point=>'<div><strong>'+point.count+'</strong><span class="bar" style="--bar:'+Math.max(3,point.count/chartMax*100)+'%"></span><small>'+h(point.label)+'</small></div>').join('')+'</div></section>'+
       '<section class="panel padded"><h2>Цели на месяц</h2>'+Object.entries(goalLabels).map(([key,label])=>state.goals[key]?'<label class="goal"><span>'+label+'</span><strong>'+stats[key]+' / '+state.goals[key]+'</strong><progress value="'+Math.min(stats[key],state.goals[key])+'" max="'+state.goals[key]+'"></progress></label>':'').join('')+(Object.values(state.goals).some(Boolean)?'':'<p class="muted">Установите свою первую цель.</p>')+'</section></div>'+
       (history.length?'<div class="duo"><section class="panel padded"><h2>Готовите чаще всего</h2>'+list(stats.popular.slice(0,5).map(item=>item.name+' · '+item.count))+'</section><section class="panel padded"><h2>Изменение оценок</h2>'+(stats.change.length?list(stats.change.map(item=>item.name+' · '+item.from+' → '+item.to)):'<p class="muted">Появится после двух оценённых попыток одного блюда.</p>')+'</section></div>':''))+
     '<section><div class="section-heading"><h2>Попытки</h2></div>'+(entries.length?'<div class="entry-grid">'+entries.map(entry=>'<article class="panel entry">'+

@@ -2,7 +2,7 @@ export const formatNumber = new Intl.NumberFormat('ru-RU',{maximumFractionDigits
 export const uid = () => globalThis.crypto.randomUUID();
 export const totalTime = recipe => recipe.prep + recipe.cook;
 export const initialState = () => ({
-  recipes:[], favorites:[], statuses:[], planned:null, shopping:[], history:[], session:null,
+  recipes:[], favorites:[], statuses:[], planned:null, shopping:[], shoppingBatches:[], history:[], session:null,
   settings:{theme:'dark',sound:true,wake:true}, goals:{monthly:0,new:0,retry:0}
 });
 
@@ -78,13 +78,19 @@ export function parseRecipes(value, recipeSchema, bundleSchema) {
   return [value];
 }
 
-export function parseBackup(value,schema) {
-  checked(validate(value,schema));
-  const data = value.data;
+export function parseBackup(value,schema,legacySchema) {
+  const legacy = value?.version === 1;
+  checked(validate(value,legacy ? legacySchema : schema));
+  const data = legacy ? {...value.data,shoppingBatches:[]} : value.data;
   const errors = data.recipes.flatMap((recipe,index)=>recipeLinks(recipe,'$.data.recipes['+(index+1)+']'));
   for (const [key, records] of Object.entries({recipes:data.recipes, statuses:data.statuses, shopping:data.shopping, history:data.history})) {
     if (new Set(records.map(item=>item.id)).size !== records.length) errors.push('$.data.'+key+' — повторяются ID');
   }
+  if (new Set(data.shoppingBatches.map(batch=>batch.id)).size !== data.shoppingBatches.length) {
+    errors.push('$.data.shoppingBatches — повторяются ID блюд');
+  }
+  const items = shoppingSections(data).flatMap(section=>section.items);
+  if (new Set(items.map(item=>item.id)).size !== items.length) errors.push('$.data.shoppingBatches — повторяются ID продуктов');
   if (data.session) {
     const {recipe,step,done,timers} = data.session;
     errors.push(...recipeLinks(recipe,'$.data.session.recipe'));
@@ -120,6 +126,25 @@ export function addShopping(list, ingredients, makeId=uid) {
     } else result.push({id:makeId(),name:item.name,quantity:item.quantity,unit:item.unit,group:item.group,state:'todo'});
   }
   return result;
+}
+export function addShoppingBatch(state, recipe, servings, makeId=uid) {
+  if (state.shoppingBatches.length >= 1000) throw Error('В покупках уже 1000 блюд. Удалите ненужные.');
+  state.shoppingBatches.push({
+    id:makeId(), recipeId:recipe.id, name:recipe.name, servings,
+    items:addShopping([],scaled(recipe.ingredients,servings,recipe.servings),makeId)
+  });
+}
+export function shoppingSections(state) {
+  const standalone = state.shopping.length ? [{name:'Общий список',items:state.shopping}] : [];
+  return [...state.shoppingBatches,...standalone];
+}
+export function findShoppingList(state,id) {
+  return shoppingSections(state).find(section=>section.items.some(item=>item.id===id))?.items;
+}
+export function removeShoppingItem(state,id) {
+  const list = findShoppingList(state,id);
+  if (list) list.splice(list.findIndex(item=>item.id===id),1);
+  state.shoppingBatches=state.shoppingBatches.filter(batch=>batch.items.length);
 }
 export function amount(item) {
   if (['г','мл'].includes(item.unit) && item.quantity >= 1000) {

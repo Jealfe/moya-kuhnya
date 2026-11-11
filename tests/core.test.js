@@ -1,23 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { activity, addShopping, changeTimer, duration, initialState, parseBackup, parseRecipes, remaining, scaled, sessionFor, statistics } from '../public/core.js';
+import { activity, addShopping, addShoppingBatch, changeTimer, duration, findShoppingList, initialState, parseBackup, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, statistics } from '../public/core.js';
 
 const read = path => JSON.parse(readFileSync(new URL('../public/data/'+path,import.meta.url),'utf8'));
 const schema=read('recipe.schema.json');
-const {bundle,backup}=read('exchange.schema.json').$defs;
+const {bundle,backup,legacyBackup}=read('exchange.schema.json').$defs;
 const ids=read('recipes/index.json');
 const recipes=ids.map(id=>read('recipes/'+id+'.json'));
 const recipe=recipes[0];
 
-test('каталог из 20 уникальных рецептов проходит проверку формата и связей',()=>{
-  assert.equal(new Set(ids).size,20);
+test('каталог из 70 уникальных рецептов проходит проверку формата, источников и связей',()=>{
+  assert.equal(new Set(ids).size,70);
   assert.deepEqual(recipes.map(recipe=>recipe.id),ids);
   recipes.forEach((recipe,index)=>{
     assert.deepEqual(parseRecipes(recipe,schema,bundle),[recipe]);
     assert.equal(recipe.image,'dish:'+index);
     assert.ok(recipe.steps.some(step=>step.timers.length));
-    assert.ok(recipe.ingredients.some(item=>item.substitution));
+    assert.match(recipe.source.url,/^https:\/\//);
+    assert.ok(recipe.ingredients.every(item=>recipe.steps.some(step=>step.ingredients.includes(item.id))),recipe.id);
   });
 });
 
@@ -68,7 +69,7 @@ test('пауза приготовления исключается из затр
   assert.equal(duration(s,41000),20000);
 });
 test('валидируется набор рецептов и диагностируются ошибки с путями',()=>{
-  assert.equal(parseRecipes({format:'moya-kuhnya-recipes',version:1,recipes},schema,bundle).length,20);
+  assert.equal(parseRecipes({format:'moya-kuhnya-recipes',version:1,recipes},schema,bundle).length,70);
   const broken=structuredClone(recipe);
   delete broken.name;
   assert.throws(()=>parseRecipes(broken,schema,bundle),/\.name.*обязательное/);
@@ -83,13 +84,13 @@ test('резервная копия проверяет вложенные дан
   const data=initialState();
   data.recipes=[recipe];
   data.session=sessionFor(recipe,4,1000,'session-1');
-  const copy={format:'moya-kuhnya-backup',version:1,created:9000,data};
-  assert.deepEqual(parseBackup(copy,backup),data);
+  const copy={format:'moya-kuhnya-backup',version:2,created:9000,data};
+  assert.deepEqual(parseBackup(copy,backup,legacyBackup),data);
   data.session.step=41;
-  assert.throws(()=>parseBackup(copy,backup),/неверный номер шага/);
+  assert.throws(()=>parseBackup(copy,backup,legacyBackup),/неверный номер шага/);
   data.session.step=0;
   data.settings.sound='yes';
-  assert.throws(()=>parseBackup(copy,backup),/settings.sound/);
+  assert.throws(()=>parseBackup(copy,backup,legacyBackup),/settings.sound/);
 });
 test('история учитывает повтор, улучшение, месяц и первую попытку',()=>{
   const at=(month,day)=>new Date(2026,month,day,12).getTime();
@@ -104,4 +105,37 @@ test('история учитывает повтор, улучшение, мес
   assert.deepEqual(stats.change,[{name:'Плов',from:2,to:4}]);
   assert.equal(activity(entries,'month',now).at(-1).count,2);
   assert.equal(activity(entries,'week',now).at(-1).count,2);
+});
+
+test('покупки разных блюд и повторные добавления остаются раздельными',()=>{
+  const data=initialState();
+  const makeId=(()=>{let id=0;return ()=>String(++id);})();
+  addShoppingBatch(data,recipe,8,makeId);
+  addShoppingBatch(data,recipe,4,makeId);
+  const saltIds=data.shoppingBatches.map(batch=>batch.items.find(item=>item.name==='Соль').id);
+  const firstSalt=findShoppingList(data,saltIds[0]).find(item=>item.id===saltIds[0]);
+  firstSalt.state='bought';
+  assert.equal(firstSalt.quantity,16);
+  assert.equal(findShoppingList(data,saltIds[1]).find(item=>item.id===saltIds[1]).state,'todo');
+  data.shoppingBatches=data.shoppingBatches.filter(batch=>batch.id!==data.shoppingBatches[0].id);
+  assert.equal(findShoppingList(data,saltIds[0]),undefined);
+  assert.equal(findShoppingList(data,saltIds[1]).find(item=>item.id===saltIds[1]).quantity,8);
+  removeShoppingItem(data,saltIds[1]);
+  assert.equal(data.shoppingBatches.length,1);
+  assert.equal(findShoppingList(data,saltIds[1]),undefined);
+});
+
+test('резервная копия версии 1 сохраняет старые покупки, версия 2 сохраняет блюда',()=>{
+  const data=initialState();
+  const makeId=(()=>{let id=0;return ()=>String(++id);})();
+  data.shopping=addShopping([],recipe.ingredients.slice(0,2),makeId);
+  const {shoppingBatches:_,...old}=data;
+  const legacy={format:'moya-kuhnya-backup',version:1,created:0,data:old};
+  assert.deepEqual(parseBackup(legacy,backup,legacyBackup),data);
+  assert.equal(shoppingSections(data)[0].name,'Общий список');
+  addShoppingBatch(data,recipe,2,makeId);
+  const latest={...legacy,version:2,data};
+  assert.deepEqual(parseBackup(latest,backup,legacyBackup),data);
+  data.shoppingBatches[0].items[0].id=data.shopping[0].id;
+  assert.throws(()=>parseBackup(latest,backup,legacyBackup),/повторяются ID продуктов/);
 });
