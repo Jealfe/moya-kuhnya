@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Рецепт «Моя кухня», версия 1",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 650
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 70
+    },
+    "difficulty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "prep": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1440
+    },
+    "cook": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1440
+    },
+    "servings": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "image": {
+      "type": "string",
+      "maxLength": 3000000,
+      "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 1000000
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "substitution": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quantity",
+          "unit",
+          "group"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 60
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 40
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2400
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$"
+            },
+            "minItems": 0,
+            "maxItems": 60
+          },
+          "temperature": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "ready": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 450
+          },
+          "parallel": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 450
+          },
+          "timers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 90
+                },
+                "seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400
+                }
+              },
+              "required": [
+                "name",
+                "seconds"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "title",
+          "instruction",
+          "ingredients",
+          "temperature",
+          "ready",
+          "parallel",
+          "timers"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 45
+    },
+    "tips": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 450
+      },
+      "minItems": 0,
+      "maxItems": 25
+    },
+    "mistakes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 450
+      },
+      "minItems": 0,
+      "maxItems": 25
+    }
+  },
+  "required": [
+    "version",
+    "id",
+    "name",
+    "description",
+    "category",
+    "difficulty",
+    "prep",
+    "cook",
+    "servings",
+    "image",
+    "ingredients",
+    "tools",
+    "steps",
+    "tips",
+    "mistakes"
+  ],
+  "additionalProperties": false
+}

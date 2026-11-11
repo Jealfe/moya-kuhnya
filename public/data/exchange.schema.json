@@ -1,0 +1,1131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "bundle": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "const": "moya-kuhnya-recipes"
+        },
+        "version": {
+          "const": 1
+        },
+        "recipes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "const": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 650
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 70
+              },
+              "difficulty": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "prep": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1440
+              },
+              "cook": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              },
+              "servings": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "image": {
+                "type": "string",
+                "maxLength": 3000000,
+                "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+              },
+              "ingredients": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "minimum": 0.001,
+                      "maximum": 1000000
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 24
+                    },
+                    "group": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    },
+                    "substitution": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 280
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "quantity",
+                    "unit",
+                    "group"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 60
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "minItems": 1,
+                "maxItems": 40
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "instruction": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2400
+                    },
+                    "ingredients": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                      },
+                      "minItems": 0,
+                      "maxItems": 60
+                    },
+                    "temperature": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 200
+                    },
+                    "ready": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 450
+                    },
+                    "parallel": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 450
+                    },
+                    "timers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 90
+                          },
+                          "seconds": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 86400
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "seconds"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 0,
+                      "maxItems": 8
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "instruction",
+                    "ingredients",
+                    "temperature",
+                    "ready",
+                    "parallel",
+                    "timers"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 45
+              },
+              "tips": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 450
+                },
+                "minItems": 0,
+                "maxItems": 25
+              },
+              "mistakes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 450
+                },
+                "minItems": 0,
+                "maxItems": 25
+              }
+            },
+            "required": [
+              "version",
+              "id",
+              "name",
+              "description",
+              "category",
+              "difficulty",
+              "prep",
+              "cook",
+              "servings",
+              "image",
+              "ingredients",
+              "tools",
+              "steps",
+              "tips",
+              "mistakes"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 1020
+        }
+      },
+      "required": [
+        "format",
+        "version",
+        "recipes"
+      ],
+      "additionalProperties": false
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "const": "moya-kuhnya-backup"
+        },
+        "version": {
+          "const": 1
+        },
+        "created": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640000000000000
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "recipes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "const": 1
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 650
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 70
+                  },
+                  "difficulty": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "prep": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1440
+                  },
+                  "cook": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  "servings": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "image": {
+                    "type": "string",
+                    "maxLength": 3000000,
+                    "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+                  },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "minimum": 0.001,
+                          "maximum": 1000000
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 24
+                        },
+                        "group": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "substitution": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 280
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "quantity",
+                        "unit",
+                        "group"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 60
+                  },
+                  "tools": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "minItems": 1,
+                    "maxItems": 40
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "instruction": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2400
+                        },
+                        "ingredients": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80,
+                            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                          },
+                          "minItems": 0,
+                          "maxItems": 60
+                        },
+                        "temperature": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 200
+                        },
+                        "ready": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 450
+                        },
+                        "parallel": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 450
+                        },
+                        "timers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 90
+                              },
+                              "seconds": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 86400
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "seconds"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 0,
+                          "maxItems": 8
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "instruction",
+                        "ingredients",
+                        "temperature",
+                        "ready",
+                        "parallel",
+                        "timers"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 45
+                  },
+                  "tips": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 450
+                    },
+                    "minItems": 0,
+                    "maxItems": 25
+                  },
+                  "mistakes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 450
+                    },
+                    "minItems": 0,
+                    "maxItems": 25
+                  }
+                },
+                "required": [
+                  "version",
+                  "id",
+                  "name",
+                  "description",
+                  "category",
+                  "difficulty",
+                  "prep",
+                  "cook",
+                  "servings",
+                  "image",
+                  "ingredients",
+                  "tools",
+                  "steps",
+                  "tips",
+                  "mistakes"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "favorites": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+              },
+              "minItems": 0,
+              "maxItems": 2000
+            },
+            "statuses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "status": {
+                    "enum": [
+                      "tried",
+                      "repeat",
+                      "mastered",
+                      "new"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 2000
+            },
+            "planned": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "shopping": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "minimum": 1E-05,
+                    "maximum": 1000000000
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 24
+                  },
+                  "group": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "state": {
+                    "enum": [
+                      "todo",
+                      "home",
+                      "bought"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "quantity",
+                  "unit",
+                  "group",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 10000
+            },
+            "history": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "recipeId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "at": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8640000000000000
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "image": {
+                    "type": "string",
+                    "maxLength": 3000000,
+                    "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+                  },
+                  "good": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 2400
+                  },
+                  "errors": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 2400
+                  },
+                  "next": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 2400
+                  },
+                  "again": {
+                    "enum": [
+                      "",
+                      "yes",
+                      "no"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "recipeId",
+                  "name",
+                  "at",
+                  "minutes",
+                  "rating",
+                  "image",
+                  "good",
+                  "errors",
+                  "next",
+                  "again"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 50000
+            },
+            "session": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                    },
+                    "recipe": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "const": 1
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 650
+                        },
+                        "category": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 70
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "prep": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1440
+                        },
+                        "cook": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1440
+                        },
+                        "servings": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "image": {
+                          "type": "string",
+                          "maxLength": 3000000,
+                          "pattern": "^(?:$|dish:(?:[0-9]|1[0-9])$|data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$)"
+                        },
+                        "ingredients": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80,
+                                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "quantity": {
+                                "type": "number",
+                                "minimum": 0.001,
+                                "maximum": 1000000
+                              },
+                              "unit": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 24
+                              },
+                              "group": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 50
+                              },
+                              "substitution": {
+                                "type": "string",
+                                "minLength": 0,
+                                "maxLength": 280
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "quantity",
+                              "unit",
+                              "group"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 1,
+                          "maxItems": 60
+                        },
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "minItems": 1,
+                          "maxItems": 40
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "instruction": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2400
+                              },
+                              "ingredients": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 80,
+                                  "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                                },
+                                "minItems": 0,
+                                "maxItems": 60
+                              },
+                              "temperature": {
+                                "type": "string",
+                                "minLength": 0,
+                                "maxLength": 200
+                              },
+                              "ready": {
+                                "type": "string",
+                                "minLength": 0,
+                                "maxLength": 450
+                              },
+                              "parallel": {
+                                "type": "string",
+                                "minLength": 0,
+                                "maxLength": 450
+                              },
+                              "timers": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 90
+                                    },
+                                    "seconds": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 86400
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "seconds"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "minItems": 0,
+                                "maxItems": 8
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "instruction",
+                              "ingredients",
+                              "temperature",
+                              "ready",
+                              "parallel",
+                              "timers"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 1,
+                          "maxItems": 45
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 450
+                          },
+                          "minItems": 0,
+                          "maxItems": 25
+                        },
+                        "mistakes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 450
+                          },
+                          "minItems": 0,
+                          "maxItems": 25
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "id",
+                        "name",
+                        "description",
+                        "category",
+                        "difficulty",
+                        "prep",
+                        "cook",
+                        "servings",
+                        "image",
+                        "ingredients",
+                        "tools",
+                        "steps",
+                        "tips",
+                        "mistakes"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "servings": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
+                    "step": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 44
+                    },
+                    "done": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 44
+                      },
+                      "minItems": 0,
+                      "maxItems": 45
+                    },
+                    "startedAt": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 8640000000000000
+                    },
+                    "elapsed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
+                    },
+                    "activeSince": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8640000000000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "timers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 90
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 86400
+                          },
+                          "remaining": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 86400
+                          },
+                          "end": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 8640000000000000
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "duration",
+                          "remaining",
+                          "end"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 0,
+                      "maxItems": 360
+                    },
+                    "reporting": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "recipe",
+                    "servings",
+                    "step",
+                    "done",
+                    "startedAt",
+                    "elapsed",
+                    "activeSince",
+                    "timers",
+                    "reporting"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "settings": {
+              "type": "object",
+              "properties": {
+                "theme": {
+                  "enum": [
+                    "dark",
+                    "light"
+                  ]
+                },
+                "sound": {
+                  "type": "boolean"
+                },
+                "wake": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "theme",
+                "sound",
+                "wake"
+              ],
+              "additionalProperties": false
+            },
+            "goals": {
+              "type": "object",
+              "properties": {
+                "monthly": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "retry": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "monthly",
+                "new",
+                "retry"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "recipes",
+            "favorites",
+            "statuses",
+            "planned",
+            "shopping",
+            "history",
+            "session",
+            "settings",
+            "goals"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "format",
+        "version",
+        "created",
+        "data"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
