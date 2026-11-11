@@ -67,6 +67,12 @@ function checked(errors) {
   if (errors.length) throw new Error(errors.slice(0,25).join('\n'));
 }
 
+export function parseJsonText(text) {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
+  try { return JSON.parse(fenced ? fenced[1] : trimmed); }
+  catch { throw Error('Не удалось прочитать JSON. Проверьте синтаксис.'); }
+}
 export function parseRecipes(value, recipeSchema, bundleSchema) {
   if (value?.format === 'moya-kuhnya-recipes') {
     checked(validate(value,bundleSchema));

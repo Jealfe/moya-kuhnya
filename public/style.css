@@ -207,6 +207,7 @@ dialog::backdrop {background:#0a0a08bc}
 .dialog-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
 dialog:has(.detail-top) {width:min(980px,calc(100% - 25px))}
 dialog .detail-body {margin-top:15px}
+.import-divider {border:0;border-top:1px solid var(--line);margin:5px 0;width:100%}
 .import-list {display:grid;gap:11px}
 .import-row {display:grid;grid-template-columns:94px 1fr;gap:12px;border-bottom:1px solid var(--line);padding:10px 0}
 .import-row .photo {height:94px;border-radius:10px}

@@ -24,7 +24,7 @@ export function home(state, recipes, featured) {
 
 export function catalog(state,recipes,filters) {
   const categories=[...new Set(recipes.map(recipe=>recipe.category))];
-  return heading('Рецепты','Выберите блюдо или добавьте свой рецепт.',button('Импорт','import',{symbol:'upload'})+link('Новый рецепт','editor',{kind:'primary',symbol:'plus'}))+
+  return heading('Рецепты','Выберите блюдо или добавьте свой рецепт.',button('Проверить GitHub','check-github',{symbol:'history'})+button('Импорт','import',{symbol:'upload'})+link('Новый рецепт','editor',{kind:'primary',symbol:'plus'}))+
     '<form id="filters" class="panel filter-panel"><div class="search">'+icon('search')+input('query',filters.query,'type="search" aria-label="Поиск рецептов" placeholder="Поиск по блюдам и продуктам"')+'</div><div class="filter-selects">'+
     field('Категория',select('category',[['','Все'],...categories.map(category=>[category,category])],filters.category))+
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+

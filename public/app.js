@@ -1,5 +1,6 @@
-import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
+import { addInboxRecipes, readRecipeInbox } from './inbox.js';
 import { area, button, clock, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
 import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
@@ -204,10 +205,16 @@ function shopDialog(item) {
     '<button class="btn primary">Сохранить</button></form>');
 }
 function fileDialog(kind) {
-  showDialog(kind==='import'?'Импорт рецептов':'Восстановление данных',
-    '<form class="form-stack" id="'+kind+'-file"><p>'+(kind==='import'?'Выберите один рецепт или набор рецептов в формате «Моей кухни».':'Выберите файл резервной копии «Моей кухни», чтобы увидеть его содержимое.')+'</p>'+
+  const fileForm = '<form class="form-stack" id="'+kind+'-file">'+
     field('Файл JSON',input('file','','type="file" accept=".json,application/json" required'))+
-    '<button class="btn primary">Проверить файл</button></form>');
+    '<button class="btn primary">Проверить файл</button></form>';
+  if (kind==='restore') {
+    showDialog('Восстановление данных','<p>Выберите файл резервной копии «Моей кухни», чтобы увидеть его содержимое.</p>'+fileForm);
+    return;
+  }
+  showDialog('Импорт рецептов','<div class="form-stack"><form class="form-stack" id="import-text">'+
+    field('JSON из чата',area('json','','rows="5" maxlength="10485760" required placeholder="Вставьте рецепт или набор рецептов из ChatGPT"'))+
+    '<button class="btn primary">Проверить текст</button></form><hr class="import-divider">'+fileForm+'</div>');
 }
 function importPreview(rows) {
   const seen=new Set(catalogItems().map(recipe=>recipe.id));
@@ -217,6 +224,39 @@ function importPreview(rows) {
     return '<div class="import-row">'+photo(recipe.image,recipe.name)+'<div><h3>'+h(recipe.name)+'</h3><p>'+h(recipe.description)+'</p><p class="muted">'+h(recipe.category)+' · '+recipe.ingredients.length+' ингредиентов · '+recipe.steps.length+' шагов</p>'+
       (duplicate?field('Этот ID уже встречается',select('choice-'+index,[['copy','Создать копию'],['replace','Заменить'],['skip','Пропустить']],'copy')):'')+'</div></div>';
   }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+button('Отмена','dialog-close')+'</div></form>');
+}
+
+async function checkGitHub() {
+  const control=document.querySelector('[data-do="check-github"]');
+  const label=control?.innerHTML;
+  if (control) {
+    control.disabled=true;
+    control.setAttribute('aria-busy','true');
+    control.textContent='Проверяем GitHub…';
+  }
+  try {
+    const {recipes,issues}=await readRecipeInbox(recipeSchema,exchange.bundle);
+    let result={added:0,existing:0,overLimit:0};
+    if (recipes.length) await change(current=>{result=addInboxRecipes(current,builtins,recipes);});
+    if (route()[0]==='recipes') {
+      catalogResults(state,catalogItems(),filters);
+    }
+    const details=[
+      result.added?'Добавлено рецептов: '+result.added:'Новых рецептов нет.',
+      result.existing?'Уже в каталоге: '+result.existing+'.':'',
+      result.overLimit?'Не добавлено из-за лимита каталога: '+result.overLimit+'.':''
+    ].filter(Boolean).join(' ');
+    if (issues.length) {
+      const list=issues.slice(0,12).map(({name,message})=>'<li>'+h(name)+' — '+h(message)+'</li>').join('');
+      showDialog('Проверка GitHub','<p>'+h(details)+'</p><p>Файлов с ошибками: '+issues.length+'.</p><ul class="error-list">'+list+'</ul>');
+    } else say(details);
+  } finally {
+    if (control?.isConnected) {
+      control.disabled=false;
+      control.removeAttribute('aria-busy');
+      control.innerHTML=label;
+    }
+  }
 }
 
 async function startCooking(id,replace=false) {
@@ -279,6 +319,7 @@ async function onAction(action,id) {
     case 'export-recipe': saveFile(id+'.json',recipe); return;
     case 'export-all': saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
     case 'import': fileDialog('import'); return;
+    case 'check-github': await checkGitHub(); return;
     case 'restore': fileDialog('restore'); return;
     case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
     case 'restore-confirm':
@@ -403,7 +444,15 @@ document.addEventListener('submit',event=>{
         navigate('recipe/'+saved.id);
         return;
       }
-      case 'import-file': importRows=parseRecipes(await readJson(form.elements.file.files[0],256),recipeSchema,exchange.bundle); importPreview(importRows); return;
+      case 'import-file':
+      case 'import-text': {
+        const value=form.getAttribute('id')==='import-text'
+          ? parseJsonText(data.get('json'))
+          : await readJson(form.elements.file.files[0],256);
+        importRows=parseRecipes(value,recipeSchema,exchange.bundle);
+        importPreview(importRows);
+        return;
+      }
       case 'import-confirm': {
         let count=0;
         const builtInIds=new Set(builtins.map(recipe=>recipe.id));
