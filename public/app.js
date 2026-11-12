@@ -1,5 +1,6 @@
 import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
+import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
 import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
 import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
@@ -9,14 +10,15 @@ const main=document.querySelector('main');
 const header=document.querySelector('#header');
 const navigation=document.querySelector('#navigation');
 const dock=document.querySelector('#timer-dock');
-const dialog=document.querySelector('dialog');
+const dialog=document.querySelector('#dialog');
+const pantryDialog=document.querySelector('#pantry-dialog');
 const notice=document.querySelector('#notice');
 const routes=[['home','Главная'],['recipes','Рецепты'],['shopping','Покупки'],['history','История'],['settings','Настройки']];
 const recipeBase='./data/recipes/';
 const filters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
-let drafts, deletedBatch=null, checkingGitHub=false;
+let pantry, drafts, deletedBatch=null, checkingGitHub=false;
 let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=false, timerSignature='';
@@ -69,7 +71,7 @@ async function changeSession(mutate) {
 
 function render({focus=false}={}) {
   if (!state) return;
-  const [page,id]=route();
+  const [page,id,origin]=route();
   const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
   document.documentElement.dataset.theme=state.settings.theme;
   document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#181a15':'#f6f2e8';
@@ -88,7 +90,7 @@ function render({focus=false}={}) {
       main.innerHTML=catalog(recipes,filters,checkingGitHub);
       catalogResults(state,recipes,filters);
       break;
-    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe)):unavailable(); break;
+    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe),false,origin==='from-pantry'):unavailable(); break;
     case 'editor':
       if (id && !recipe) { main.innerHTML=unavailable(); break; }
       if (draftKey!==(id??'')) {
@@ -117,8 +119,14 @@ function render({focus=false}={}) {
 }
 
 function onRoute() {
-  if (route()[0]!=='editor') {draft=null; draftKey=null;}
+  const [page,id]=route();
+  if (page!=='editor') {draft=null; draftKey=null;}
+  const wasOpen=pantryDialog.open;
+  const mode=page==='recipes'?pantryMode(id):null;
+  if (!mode) pantry.show(null);
   render({focus:true});
+  if (mode) pantry.show(mode,catalogItems());
+  else if (wasOpen && page==='recipes') main.querySelector('.catalog-options a').focus();
 }
 function nextCountdown(timers,now=Date.now()) {
   return Math.min(...timers.filter(timer=>timer.end!==null && remaining(timer,now)>0).map(timer=>remaining(timer,now)));
@@ -278,7 +286,7 @@ async function checkGitHub() {
       result.existing?'Уже в каталоге: '+result.existing+'.':'',
       result.overLimit?'Не добавлено из-за лимита каталога: '+result.overLimit+'.':''
     ].filter(Boolean).join(' ');
-    if (issues.length && route()[0]==='recipes' && !dialog.open) {
+    if (issues.length && route()[0]==='recipes' && !dialog.open && !pantryDialog.open) {
       const list=issues.slice(0,12).map(({name,message})=>'<li>'+h(name)+' — '+h(message)+'</li>').join('');
       showDialog('Проверка GitHub','<p>'+h(details)+'</p><p>Файлов с ошибками: '+issues.length+'.</p><ul class="error-list">'+list+'</ul>');
     } else say(details+(issues.length?' Файлов с ошибками: '+issues.length+'.':''));
@@ -563,7 +571,7 @@ document.addEventListener('click',event=>{
   else void run(()=>onAction(control.dataset.do,control.dataset.id));
 });
 document.addEventListener('keydown',event=>{
-  if (event.key!=='Escape' || dialog.open) return;
+  if (event.key!=='Escape' || dialog.open || pantryDialog.open) return;
   const menu=document.querySelector('.recipe-add-menu[open]');
   if (menu) {
     menu.open=false;
@@ -618,6 +626,7 @@ document.addEventListener('change',event=>{
   });
 });
 document.addEventListener('submit',event=>{
+  if (event.defaultPrevented) return;
   event.preventDefault();
   const form=event.target, data=new FormData(form);
   void run(async()=>{
@@ -746,7 +755,7 @@ const json = async path => {
   return response.json();
 };
 function softRender() {
-  if (state && !main.querySelector('#editor-form,#report-form') && !dialog.open) render();
+  if (state && !main.querySelector('#editor-form,#report-form') && !dialog.open && !pantryDialog.open) render();
 }
 async function setupWorker() {
   if (!('serviceWorker' in navigator) || document.documentElement.dataset.build!=='production') return;
@@ -785,7 +794,11 @@ try {
   recipeSchema=schema;
   exchange=exchangeSchema.$defs;
   storage=db;
-  [state,builtins,drafts]=await Promise.all([storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts()]);
+  const [saved,recipes,savedDrafts,products]=await Promise.all([
+    storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts(),storage.readPantry()
+  ]);
+  [state,builtins,drafts]=[saved,recipes,savedDrafts];
+  pantry=createPantry(pantryDialog,storage,products);
   featuredId='pilaf';
   onRoute();
   tick();

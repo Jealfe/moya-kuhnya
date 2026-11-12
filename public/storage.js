@@ -11,7 +11,7 @@ export async function openStorage() {
   });
   db.onversionchange = () => db.close();
 
-  function transaction(mode,operate) {
+  function transaction(mode,operate,key='state',initialize=initialState) {
     return new Promise((resolve,reject) => {
       const tx = db.transaction('data',mode);
       let result;
@@ -19,11 +19,11 @@ export async function openStorage() {
       tx.oncomplete = () => resolve(result);
       tx.onabort = () => reject(error ?? tx.error ?? new Error('Изменения не сохранены.'));
       const store = tx.objectStore('data');
-      const request = store.get('state');
+      const request = store.get(key);
       request.onsuccess = () => {
         try {
-          result = operate({...initialState(), ...request.result});
-          if (mode === 'readwrite') store.put(result,'state');
+          result = operate(key==='state'?{...initialize(),...request.result}:request.result??initialize());
+          if (mode === 'readwrite') store.put(result,key);
         } catch (failure) {
           error = failure;
           tx.abort();
@@ -42,6 +42,8 @@ export async function openStorage() {
   return {
     read: () => transaction('readonly',state=>state),
     change: mutate => transaction('readwrite',mutate),
+    readPantry: () => transaction('readonly',products=>products,'pantry',()=>[]),
+    changePantry: mutate => transaction('readwrite',mutate,'pantry',()=>[]),
     readDrafts: async () => Object.fromEntries((await draftRequest('readonly',store=>
       store.getAll(IDBKeyRange.bound('draft/','draft0',false,true)))).map(({id,value})=>[id,value])),
     saveDraft: (id,value) => draftRequest('readwrite',store=>value===null

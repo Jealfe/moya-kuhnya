@@ -109,6 +109,8 @@ main:focus {outline:none}
 .no-photo .icon {width:62px;height:62px}
 .filter-panel {padding:15px;display:grid;gap:12px}
 .catalog-title {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.catalog-options {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.catalog-options .btn {min-height:44px}
 #recipe-count {margin:0}
 .pending-impressions {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
 .draft-photo {margin:0;overflow-wrap:anywhere}
@@ -222,6 +224,31 @@ fieldset {min-width:0}
 .entry .actions {margin-top:8px}
 dialog {max-height:calc(100dvh - 35px);width:min(700px,calc(100% - 25px));padding:clamp(14px,3vw,26px);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto}
 dialog::backdrop {background:#0a0a08bc}
+#pantry-dialog[open] {display:flex;flex-direction:column;overflow:hidden;width:min(640px,calc(100% - 24px));height:min(740px,90dvh);padding:0}
+#pantry-dialog .dialog-heading {margin:0;padding:12px 16px;border-bottom:1px solid var(--line)}
+#pantry-dialog .dialog-heading .btn {min-height:44px;min-width:44px}
+.pantry-body {display:flex;flex:1;flex-direction:column;min-height:0;margin:0}
+.pantry-scroll {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 16px}
+.pantry-scroll p {margin:0}
+.pantry-scroll textarea {resize:vertical;min-height:65px}
+.pantry-scroll .error-list {padding-left:0}
+.pantry-footer {padding:10px 16px;border-top:1px solid var(--line)}
+.pantry-footer .btn {width:100%;min-height:46px}
+.pantry-chips {display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0}
+.pantry-chips .btn {min-height:44px;text-align:left;white-space:normal;overflow-wrap:anywhere;border-radius:16px}
+.pantry-chips li {max-width:100%}
+.pantry-chips .icon {flex:none;width:14px;height:14px}
+.pantry-status {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.pantry-result-group {margin-top:18px}
+.pantry-result-group h3 {margin:0 0 6px}
+.pantry-result-group ul {list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.pantry-result {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;min-height:52px;border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow-wrap:anywhere}
+.pantry-result small {display:block;color:var(--muted);margin-top:4px}
+.pantry-result .icon {flex:none}
+@media(max-width:620px) {
+  #pantry-dialog[open] {inset:auto 0 var(--pantry-keyboard-space,0px);margin:0;width:100%;height:min(calc(var(--pantry-viewport-height,100dvh) * .88),740px);max-height:none;border-radius:18px 18px 0 0}
+  .pantry-footer {padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+}
 .dialog-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
 dialog:has(.detail-top) {width:min(980px,calc(100% - 25px))}
 dialog .detail-body {margin-top:15px}

@@ -35,7 +35,8 @@ export function catalog(recipes,filters,checkingGitHub) {
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
     '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label></div></form>'+
-    '<p id="recipe-count" class="muted" aria-live="polite"></p><div id="recipe-results" class="cards"></div>';
+    '<div class="catalog-options"><p id="recipe-count" class="muted" aria-live="polite"></p>'+
+    link('Что есть дома?','recipes/pantry',{symbol:'bowl'})+'</div><div id="recipe-results" class="cards"></div>';
 }
 export function catalogResults(state,recipes,filters) {
   const clean = value => value.toLocaleLowerCase('ru').replace(/ё/g,'е');
@@ -48,7 +49,7 @@ export function catalogResults(state,recipes,filters) {
   document.querySelector('#recipe-count').textContent='Найдено: '+matches.length;
   document.querySelector('#recipe-results').innerHTML=matches.length?matches.map(recipe=>card(recipe,state)).join(''):empty('Ничего не найдено','Попробуйте изменить поиск или фильтры.');
 }
-export function recipePage(state,recipe,servings,preview=false) {
+export function recipePage(state,recipe,servings,preview=false,fromPantry=false) {
   const favorite=state.favorites.includes(recipe.id);
   const planned=state.planned===recipe.id;
   const history=ordered(state.history.filter(entry=>entry.recipeId===recipe.id));
@@ -58,7 +59,7 @@ export function recipePage(state,recipe,servings,preview=false) {
     '<div class="portion-buttons"><button type="button" class="btn" data-do="portion-down" data-id="'+h(recipe.id)+'" aria-label="Уменьшить число порций">−</button>'+
     '<button type="button" class="btn" data-do="portion-up" data-id="'+h(recipe.id)+'" aria-label="Увеличить число порций">+</button></div>'+
     '<small class="portion-error" id="portion-error" hidden>Введите целое число от 1 до 100.</small></div>';
-  return (preview?'':link('Все рецепты','recipes',{kind:'quiet',symbol:'back'}))+
+  return (preview?'':link(fromPantry?'К подборке':'Все рецепты',fromPantry?'recipes/pantry-results':'recipes',{kind:'quiet',symbol:'back'}))+
     '<section class="detail-top">'+photo(recipe.image,recipe.name)+'<div class="detail-copy"><div class="kicker">'+h(recipe.category)+'</div><h1>'+h(recipe.name)+'</h1><p class="lead">'+h(recipe.description)+'</p>'+
     '<div class="pills"><span>'+icon('time')+' Подготовка '+recipe.prep+' мин</span><span>'+icon('time')+' Готовка '+recipe.cook+' мин</span><span>Сложность '+recipe.difficulty+'/5</span></div>'+actions+
     (preview?'':'<div class="actions">'+button(favorite?'В избранном':'В избранное','favorite',{id:recipe.id,kind:favorite?'active':'',symbol:'heart'})+button(planned?'Убрать из плана':'Запланировать','plan',{id:recipe.id})+link('Редактировать','editor/'+recipe.id)+button('Экспорт','export-recipe',{id:recipe.id,symbol:'download'})+'</div>'+
