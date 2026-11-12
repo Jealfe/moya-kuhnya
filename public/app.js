@@ -794,11 +794,11 @@ try {
   recipeSchema=schema;
   exchange=exchangeSchema.$defs;
   storage=db;
-  const [saved,recipes,savedDrafts,products]=await Promise.all([
+  const [saved,recipes,savedDrafts,savedPantry]=await Promise.all([
     storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts(),storage.readPantry()
   ]);
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
-  pantry=createPantry(pantryDialog,storage,products);
+  pantry=createPantry(pantryDialog,storage,savedPantry);
   featuredId='pilaf';
   onRoute();
   tick();

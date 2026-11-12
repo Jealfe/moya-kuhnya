@@ -232,6 +232,8 @@ dialog::backdrop {background:#0a0a08bc}
 .pantry-scroll p {margin:0}
 .pantry-scroll textarea {resize:vertical;min-height:65px}
 .pantry-scroll .error-list {padding-left:0}
+.pantry-basics {min-height:44px}
+[data-pantry-quick][hidden] {display:none}
 .pantry-footer {padding:10px 16px;border-top:1px solid var(--line)}
 .pantry-footer .btn {width:100%;min-height:46px}
 .pantry-chips {display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0}

@@ -10,36 +10,50 @@ function editContent() {
   return '<form id="pantry-form" class="pantry-body">'+
     '<div class="pantry-scroll"><div class="form-stack">'+
     '<label class="field"><span>Продукты дома</span>'+area('products','','rows="2" maxlength="25000" aria-describedby="pantry-help" placeholder="Например, картошка, яйца, молоко"')+'</label>'+
-    '<p class="muted" id="pantry-help">Вводите по одному или вставьте список через запятую или с новой строки.</p>'+
+    '<p class="muted" id="pantry-help">Добавляйте продукты по одному или вставьте список. Блюда с совпадениями появятся ниже.</p>'+
     '<div class="pantry-chips" data-pantry-suggestions aria-label="Подсказки"></div>'+
     '<div><button class="btn" type="button" data-pantry-add-input>Добавить в список</button></div>'+
-    '<div class="pantry-chips" data-pantry-quick aria-label="Быстрое добавление"></div>'+
+    '<label class="toggle pantry-basics"><input type="checkbox" data-pantry-basics> Вода, соль и растительное масло есть дома</label>'+
+    '<div class="pantry-chips" data-pantry-quick aria-label="Быстрое добавление" hidden></div>'+
     '<p class="error-list" data-pantry-error role="alert" hidden></p>'+
     '<section><h3>Мой список <span class="muted" data-pantry-count></span></h3><div data-pantry-list></div></section>'+
+    '<section data-pantry-preview aria-label="Подходящие блюда" hidden></section>'+
     '<span class="pantry-status" role="status" data-pantry-status></span>'+
-    '</div></div><div class="pantry-footer"><button class="btn primary">Подобрать рецепты</button></div></form>';
+    '</div></div><div class="pantry-footer"><button class="btn primary" data-pantry-results>Смотреть рецепты</button></div></form>';
 }
 
-function resultContent(recipes,products) {
-  const matches=matchRecipes(recipes,products);
-  const groups=['Можно приготовить','Не хватает одного продукта','Не хватает двух продуктов'];
-  const sections=groups.map((title,index)=>{
-    const rows=matches.filter(match=>match.missing.length===index);
-    if (!rows.length) return '';
-    return '<section class="pantry-result-group"><h3>'+title+' <span class="muted">'+rows.length+'</span></h3><ul>'+
-      rows.map(({recipe,missing,minutes})=>'<li><a href="#/recipe/'+h(recipe.id)+'/from-pantry" class="pantry-result" data-pantry-recipe>'+
-        '<span><strong>'+h(recipe.name)+'</strong><small>'+minutes+' мин'+(missing.length?' · Нужно: '+h(missing.join(', ')):'')+'</small></span>'+
-        icon('arrow')+'</a></li>').join('')+'</ul></section>';
-  }).join('');
-  const empty=products.length?'Нет блюд с таким набором. Добавьте другие продукты, которые есть дома.':'Добавьте продукты, чтобы увидеть подходящие блюда.';
+const noMatches='Совпадений пока нет. Попробуйте другое название или добавьте продукты.';
+const isReady = ({missing,check}) => !missing.length && !check.length;
+
+function resultCard({recipe,available,check,missing,minutes},preview) {
+  const total=available.length+check.length+missing.length;
+  const facts='<span><strong>'+h(recipe.name)+'</strong><small>Совпало '+(available.length+check.length)+' из '+total+
+    ' · '+minutes+' мин</small>'+
+    (available.length?'<small>Есть дома: '+h(available.join(', '))+'</small>':'')+
+    (check.length?'<small>Уточните дома: '+h(check.join(', '))+'</small>':'')+
+    (missing.length?'<small>Докупить: '+h(missing.join(', '))+'</small>':'')+'</span>';
+  return '<li>'+(preview?'<div class="pantry-result">'+facts+'</div>':
+    '<a href="#/recipe/'+h(recipe.id)+'/from-pantry" class="pantry-result" data-pantry-recipe>'+facts+icon('arrow')+'</a>')+'</li>';
+}
+
+function resultGroup(title,rows,preview=false) {
+  return rows.length?'<section class="pantry-result-group"><h3>'+title+'</h3><ul>'+
+    rows.map(row=>resultCard(row,preview)).join('')+'</ul></section>':'';
+}
+
+function resultContent(recipes,{products,useBasics}) {
+  const matches=matchRecipes(recipes,products,{useBasics});
+  const sections=resultGroup('Можно приготовить',matches.filter(isReady))+
+    resultGroup('Блюда с вашими продуктами',matches.filter(match=>!isReady(match)));
   return '<div class="pantry-body"><div class="pantry-scroll">'+
-    (sections?'<p class="muted">Проверьте количество продуктов по рецепту.</p>'+sections:'<p>'+empty+'</p>')+
+    (sections?'<p class="muted">Выше блюда с большим числом совпадений по основным продуктам. Проверьте вид и количество по рецепту.</p>'+sections:
+      '<p>'+(products.length?noMatches:'Добавьте продукты, чтобы увидеть подходящие блюда.')+'</p>')+
     '</div><div class="pantry-footer"><button class="btn primary" type="button" data-pantry-edit>Изменить список</button></div></div>';
 }
 
-export function createPantry(dialog,storage,initialProducts) {
-  let products=initialProducts;
-  let mode=null, catalog, busy=false, resultsScroll=0;
+export function createPantry(dialog,storage,initialPantry) {
+  let {products,useBasics}=initialPantry;
+  let mode=null, catalog, currentRecipes, busy=false, resultsScroll=0;
   const get = selector => dialog.querySelector(selector);
   const input = () => get('textarea');
   const error = message => {
@@ -63,26 +77,46 @@ export function createPantry(dialog,storage,initialProducts) {
       '<button class="btn" type="button" data-pantry-add="'+h(name)+'">'+h(name)+'</button>').join('');
   }
 
+  function preview() {
+    const pending=splitProducts(input().value,catalog).filter(name=>catalog.has(productKey(name)));
+    const matches=matchRecipes(currentRecipes,[...products,...pending],{useBasics});
+    const panel=get('[data-pantry-preview]');
+    panel.hidden=!products.length && !pending.length;
+    const ready=matches.filter(isReady);
+    const partial=matches.filter(match=>!isReady(match));
+    panel.innerHTML=matches.length?
+      resultGroup('Можно приготовить',ready.slice(0,1),true)+resultGroup('Блюда с вашими продуктами',partial.slice(0,ready.length?2:3),true):
+      (panel.hidden?'':'<p class="muted">'+noMatches+'</p>');
+    get('[data-pantry-results]').textContent=matches.length?'Смотреть рецепты ('+matches.length+')':'Смотреть рецепты';
+  }
+
   function refresh() {
     const keys=new Set(products.map(productKey));
     get('[data-pantry-count]').textContent=products.length;
-    get('[data-pantry-quick]').innerHTML=quickProducts.map(name=>
+    get('[data-pantry-basics]').checked=useBasics;
+    const quick=get('[data-pantry-quick]');
+    quick.hidden=useBasics;
+    quick.innerHTML=useBasics?'':quickProducts.map(name=>
       '<button class="btn quiet" type="button" data-pantry-add="'+h(name)+'" '+(keys.has(productKey(name))?'disabled':'')+'>+ '+h(name)+'</button>').join('');
     get('[data-pantry-list]').innerHTML=products.length?
       '<ul class="pantry-chips">'+products.map(name=>'<li><button class="btn" type="button" data-pantry-remove="'+h(name)+
         '" aria-label="Убрать '+h(name)+'">'+h(name)+' '+icon('close')+'</button></li>').join('')+'</ul>':
       '<p class="muted">Список пока пуст.</p>';
     suggestions();
+    preview();
   }
 
-  async function changeList({add=[],remove,clearInput=false}) {
+  async function changeList({add=[],remove,clearInput=false,basics}={}) {
     const previous=input().value;
     const currentInput=input();
     try {
       busy=true;
       error('');
-      products=await storage.changePantry(current=>remove?
-        current.filter(name=>productKey(name)!==productKey(remove)):updateProducts(current,add,catalog));
+      ({products,useBasics}=await storage.changePantry(current=>({
+        products:remove?current.products.filter(name=>productKey(name)!==productKey(remove)):
+          add.length?updateProducts(current.products,add,catalog):current.products,
+        useBasics:basics??current.useBasics
+      })));
       resultsScroll=0;
       if (mode==='edit' && input()===currentInput) {
         if (clearInput && currentInput.value===previous) currentInput.value='';
@@ -91,6 +125,7 @@ export function createPantry(dialog,storage,initialProducts) {
       }
       return true;
     } catch (failure) {
+      if (mode==='edit') get('[data-pantry-basics]').checked=useBasics;
       error(failure.message || 'Не удалось сохранить список.');
       return false;
     } finally {
@@ -99,7 +134,12 @@ export function createPantry(dialog,storage,initialProducts) {
   }
 
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
-  dialog.addEventListener('input',event=>{if (event.target===input()) {error('');suggestions();}});
+  dialog.addEventListener('input',event=>{if (event.target===input()) {error('');suggestions();preview();}});
+  dialog.addEventListener('change',event=>{
+    if (!event.target.hasAttribute('data-pantry-basics')) return;
+    if (busy) {event.target.checked=useBasics;return;}
+    void changeList({basics:event.target.checked});
+  });
   dialog.addEventListener('click',async event=>{
     const control=event.target.closest('button,a');
     if (!control) return;
@@ -139,11 +179,14 @@ export function createPantry(dialog,storage,initialProducts) {
         return;
       }
       mode=next;
-      if (mode==='edit') catalog=productCatalog(recipes);
+      if (mode==='edit') {
+        currentRecipes=recipes;
+        catalog=productCatalog(recipes);
+      }
       dialog.innerHTML='<div class="dialog-heading"><h2 id="pantry-title" tabindex="-1">'+
         (mode==='edit'?'Что есть дома?':'Подборка рецептов')+
         '</h2><button class="btn quiet" type="button" data-pantry-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
-        (mode==='edit'?editContent():resultContent(recipes,products));
+        (mode==='edit'?editContent():resultContent(recipes,{products,useBasics}));
       if (mode==='edit') refresh();
       if (!dialog.open) dialog.showModal();
       fitViewport();

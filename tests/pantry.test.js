@@ -22,9 +22,9 @@ test('список принимает несколько строк и сохр�
   assert.throws(()=>updateProducts([],['а'.repeat(121)],catalog),/120/);
 });
 
-test('рецепты сгруппированы по нехватке и отсортированы по времени',()=>{
-  assert.deepEqual(matchRecipes(recipes,['Картошка','Свекла']).map(({recipe,missing})=>[recipe.name,missing]),[
-    ['Быстрее',[]],['Дольше',[]],['С чесноком',['Чеснок']],['Со специями',['Морковь','Зира (кумин), молотая']]
+test('рецепты ранжируются по совпадениям без ограничения числа недостающих продуктов',()=>{
+  assert.deepEqual(matchRecipes(recipes,['Картошка','Свекла'],{useBasics:false}).map(({recipe,missing})=>[recipe.name,missing]),[
+    ['Быстрее',[]],['Дольше',[]],['С чесноком',['Чеснок']],['Со специями',['Морковь','Зира (кумин), молотая']],['Не хватает трёх',['Соль','Сахар','Морковь']]
   ]);
   assert.deepEqual(matchRecipes(recipes,[]),[]);
   assert.deepEqual(matchRecipes(recipes,['яблоко']),[]);
@@ -42,4 +42,34 @@ test('замена растительного масла направленна�
   ]);
   assert.deepEqual(matchRecipes(dishes,['Куриные бёдра','Растительное масло']).find(({recipe})=>recipe.name==='Бёдра').missing,
     ['Подсолнечное рафинированное масло']);
+});
+
+test('картофель, курица и рис поднимают общие совпадения и сохраняют отдельные блюда',()=>{
+  const dishes=[
+    recipe('Пюре',['Картофель','Молоко']),
+    recipe('Курица с картофелем',['Куриные бёдра','Картофель','Чеснок']),
+    recipe('Рис с курицей и картофелем',['Картофель','Куриное филе','Рис варёный','Морковь','Сахар','Чеснок','Лайм']),
+    recipe('Салат',['Помидоры','Соль'])
+  ];
+  assert.equal(matchRecipes(dishes,['картофель','курица'])[0].recipe.name,'Курица с картофелем');
+  const matches=matchRecipes(dishes,['картофель','курица','рис']);
+  assert.equal(matches.length,3);
+  assert.deepEqual(matches[0].check,['Куриное филе','Рис варёный']);
+  assert.deepEqual(matches[0].missing,['Морковь','Сахар','Чеснок','Лайм']);
+  assert.equal(matches[0].matchedProducts,3);
+  assert.deepEqual(matchRecipes(dishes,['картофель','курица','рис','рис длиннозёрный']).find(({recipe})=>recipe.name==='Рис с курицей и картофелем').missing.includes('Рис варёный'),true);
+});
+
+test('основы доступны по умолчанию и не создают совпадений сами по себе',()=>{
+  const dishes=[
+    recipe('Картофель',['Картофель','Соль','Вода','Растительное масло']),
+    recipe('Жареная рыба',['Рыба','Растительное масло']),
+    recipe('Пюре',['Картофель','Сливочное масло','Оливковое масло'])
+  ];
+  assert.deepEqual(matchRecipes(dishes,[]),[]);
+  const matches=matchRecipes(dishes,['картошка']);
+  assert.equal(matches.length,2);
+  assert.deepEqual(matches[0].available,['Картофель','Соль','Вода','Растительное масло']);
+  assert.deepEqual(matches[1].missing,['Сливочное масло','Оливковое масло']);
+  assert.deepEqual(matchRecipes(dishes,['картошка'],{useBasics:false})[1].missing,['Соль','Вода','Растительное масло']);
 });

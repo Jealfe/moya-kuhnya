@@ -25,6 +25,7 @@ const variants = [
   ['Кабачок','Кабачки'],
   ['Баклажан','Баклажаны'],
   ['Яблоко','Яблоки'],
+  ['Курица','Куриное мясо'],
   ['Куриное филе','Куриная грудка','Филе куриной грудки'],
   ['Куриные бёдра','Куриное бедро','Бёдра куриные'],
   ['Филе куриного бедра','Куриное бедро без кости','Филе куриных бёдер'],
@@ -59,9 +60,16 @@ export const productKey = name => {
   return aliases.get(key)??key;
 };
 
+const productFamilies = new Map([
+  ['курица',['куриное филе','куриные бедра','филе куриного бедра','куриный фарш','куриные голени','куриные крылья','целая курица']],
+  ['рис',['рис длиннозерный','рис круглозерный','рис басмати','рис жасмин','рис арборио','бурый рис','рис вареный']]
+]);
+const defaultProducts = new Set(quickProducts.map(productKey));
+const basicProducts = new Set([...defaultProducts,'подсолнечное рафинированное масло']);
+
 export function productCatalog(recipes) {
   const names = new Map();
-  for (const name of [...quickProducts,...recipes.flatMap(recipe=>recipe.ingredients.map(item=>item.name))]) {
+  for (const name of [...quickProducts,'Курица','Рис',...recipes.flatMap(recipe=>recipe.ingredients.map(item=>item.name))]) {
     const key = productKey(name);
     if (!names.has(key)) names.set(key,name);
     if (normalize(name)===key) names.set(key,name);
@@ -106,14 +114,35 @@ export function updateProducts(products,candidates,catalog) {
   return [...list.values()];
 }
 
-export function matchRecipes(recipes,products) {
+export function matchRecipes(recipes,products,{useBasics=true}={}) {
   const selected=new Set(products.map(productKey));
   if (!selected.size) return [];
+  const broadMatches=new Map();
+  for (const [family,variants] of productFamilies) {
+    const specific=variants.find(key=>selected.has(key));
+    if (!specific && selected.has(family)) for (const key of variants) broadMatches.set(key,family);
+    if (specific) broadMatches.set(family,specific);
+  }
   return recipes.flatMap(recipe=>{
     const requirements=new Map(recipe.ingredients.map(item=>[productKey(item.name),item.name]));
-    const missing=[...requirements].filter(([key])=>!selected.has(key) &&
-      !substitutions.get(key)?.some(alternative=>selected.has(alternative))).map(([,name])=>name);
-    if (missing.length>2 || missing.length===requirements.size) return [];
-    return [{recipe,missing,minutes:totalTime(recipe)}];
-  }).sort((a,b)=>a.missing.length-b.missing.length || a.minutes-b.minutes || a.recipe.name.localeCompare(b.recipe.name,'ru'));
+    const used=new Set(), main=new Set();
+    const available=[],check=[],missing=[];
+    for (const [key,name] of requirements) {
+      const exact=selected.has(key)?key:substitutions.get(key)?.find(option=>selected.has(option));
+      const assumed=useBasics && defaultProducts.has(key);
+      const broad=broadMatches.get(key);
+      const matched=exact??broad;
+      if (matched) {
+        used.add(matched);
+        if (!basicProducts.has(key)) main.add(matched);
+      }
+      if (exact || assumed) available.push(name);
+      else if (broad) check.push(name);
+      else missing.push(name);
+    }
+    if (!used.size) return [];
+    return [{recipe,available,check,missing,matchedProducts:used.size,mainMatches:main.size,minutes:totalTime(recipe)}];
+  }).sort((a,b)=>b.mainMatches-a.mainMatches || b.matchedProducts-a.matchedProducts ||
+    a.missing.length+a.check.length-b.missing.length-b.check.length ||
+    a.check.length-b.check.length || a.minutes-b.minutes || a.recipe.name.localeCompare(b.recipe.name,'ru'));
 }

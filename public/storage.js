@@ -39,11 +39,13 @@ export async function openStorage() {
       tx.onabort=()=>reject(tx.error ?? new Error('Черновик не сохранён.'));
     });
   }
+  const pantryState = saved => Array.isArray(saved)?{products:saved,useBasics:true}:saved;
+  const emptyPantry = () => ({products:[],useBasics:true});
   return {
     read: () => transaction('readonly',state=>state),
     change: mutate => transaction('readwrite',mutate),
-    readPantry: () => transaction('readonly',products=>products,'pantry',()=>[]),
-    changePantry: mutate => transaction('readwrite',mutate,'pantry',()=>[]),
+    readPantry: () => transaction('readonly',pantryState,'pantry',emptyPantry),
+    changePantry: mutate => transaction('readwrite',saved=>mutate(pantryState(saved)),'pantry',emptyPantry),
     readDrafts: async () => Object.fromEntries((await draftRequest('readonly',store=>
       store.getAll(IDBKeyRange.bound('draft/','draft0',false,true)))).map(({id,value})=>[id,value])),
     saveDraft: (id,value) => draftRequest('readwrite',store=>value===null
