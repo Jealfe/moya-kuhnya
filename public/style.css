@@ -309,3 +309,10 @@ dialog .detail-body {margin-top:15px}
   @keyframes appear {from {opacity:0;transform:translateY(6px)}}
 }
 @media(prefers-reduced-motion:reduce) {html {scroll-behavior:auto}}
+
+/* AI advice reuses the existing panels, notes and controls. */
+.ai-issue {border-top:1px solid var(--line);padding-top:12px;margin-top:16px}
+.ai-issue li {margin-bottom:14px}
+.ai-issue .actions {margin-top:8px}
+.ai-advice {margin-bottom:18px}
+#ai-settings input[type=password] {font-family:monospace}

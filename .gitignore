@@ -4,3 +4,4 @@ coverage/
 *.jks
 *.keystore
 .env
+work/

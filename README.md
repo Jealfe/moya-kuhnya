@@ -46,3 +46,6 @@ GitHub Pages раздаёт папку `dist`. Относительные пут
 Тот же исходный код работает внутри APK на Capacitor. Сборка, установка и перенос данных:
 [docs/android.md](docs/android.md). Быстрый старт: `npm ci && npm run android:apk`.
 Эмулятор для сборки не требуется.
+
+Настройка GigaChat и анализ отзывов: [docs/gigachat.md](docs/gigachat.md).
+Браузерные проверки: `npx playwright install chromium && npm run test:browser`.

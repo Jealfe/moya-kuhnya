@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </base-config>
+    <!-- Official CA only for the two fixed GigaChat endpoints. Hostname checks remain enabled. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.giga.chat</domain>
+        <domain includeSubdomains="false">ngw.devices.sberbank.ru</domain>
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="@raw/russian_trusted_root_ca"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

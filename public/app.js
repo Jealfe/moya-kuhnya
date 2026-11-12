@@ -1,3 +1,4 @@
+import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
 import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
@@ -24,6 +25,7 @@ let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
+const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate),render:()=>render(),showDialog,showError:error=>showError(error)});
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
 const navigate = (path) => { location.hash='/'+path; };
@@ -61,6 +63,7 @@ function confirmAction(title,message,label,action,id='') {
 const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>');
 async function change(mutate) {
   state=await storage.change(current=>{mutate(current); return current;});
+  await ai.refreshAdvice();
 }
 async function changeSession(mutate) {
   const id=state.session?.id;
@@ -91,7 +94,7 @@ function render({focus=false}={}) {
       main.innerHTML=catalog(recipes,filters,checkingGitHub);
       catalogResults(state,recipes,filters);
       break;
-    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe),false,origin==='from-pantry'):unavailable(); break;
+    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe),false,origin==='from-pantry',ai):unavailable(); break;
     case 'editor':
       if (id && !recipe) { main.innerHTML=unavailable(); break; }
       if (draftKey!==(id??'')) {
@@ -100,15 +103,15 @@ function render({focus=false}={}) {
       }
       main.innerHTML=editor(draft,id,drafts['editor-photo/'+draftKey]);
       break;
-    case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id]); break;
+    case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id],ai); break;
     case 'impression': {
       const entry=state.history.find(item=>item.id===id && item.pending);
       main.innerHTML=entry?reportPage(entry,drafts['report/'+id]):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
       break;
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
-    case 'history': main.innerHTML=historyPage(state,id,period); break;
-    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent)); break;
+    case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
+    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent),ai); break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);
@@ -323,7 +326,7 @@ function updateAutomaticStatus(current,recipeId) {
 async function finishCooking(pending=true,report={}) {
   const {id,recipe}=state.session;
   const entry={id,recipeId:recipe.id,name:recipe.name,at:Date.now(),minutes:Math.round(duration(state.session)/60000),
-    rating:0,image:'',good:'',errors:'',next:'',again:'',...report,...(pending?{pending:true}:{})};
+    rating:0,image:'',good:'',errors:'',next:'',again:'',servings:state.session.servings,recipeSnapshot:{...structuredClone(recipe),image:''},...report,...(pending?{pending:true}:{})};
   await changeSession((session,current)=>{
     if (current.history.some(item=>item.id===entry.id)) throw Error('Эта готовка уже записана.');
     if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
@@ -437,6 +440,7 @@ async function onAction(action,id) {
       dialog.close();
       say('Восстанавливаем данные…');
       state=await storage.change(()=>snapshot);
+      await ai.refreshAdvice();
       say('Данные восстановлены');
       break;
     }
@@ -524,6 +528,7 @@ async function onAction(action,id) {
         const index=current.history.findIndex(entry=>entry.id===id);
         if (index!==-1) {
           const [entry]=current.history.splice(index,1);
+          current.aiAnalyses=(current.aiAnalyses??[]).filter(item=>item.entryId!==entry.id);
           const status=current.statuses.find(item=>item.id===entry.recipeId);
           if (reset && status?.automatic===undefined && ['tried','repeat'].includes(status?.status) &&
               !current.history.some(item=>item.recipeId===entry.recipeId)) current.statuses=current.statuses.filter(item=>item.id!==entry.recipeId);
@@ -568,6 +573,7 @@ document.addEventListener('click',event=>{
   if (state) unlockSound();
   const control=event.target.closest('[data-do]');
   if (!control) return;
+  if (control.dataset.do.startsWith('ai-')) {void ai.action(control.dataset.do,control.dataset.id).catch(showError); return;}
   if (control.dataset.do==='check-github') void checkGitHub();
   else void run(()=>onAction(control.dataset.do,control.dataset.id));
 });
@@ -629,7 +635,9 @@ document.addEventListener('change',event=>{
 document.addEventListener('submit',event=>{
   if (event.defaultPrevented) return;
   event.preventDefault();
-  const form=event.target, data=new FormData(form);
+  const form=event.target;
+  if (form.id==='ai-settings') {void ai.save(form);return;}
+  const data=new FormData(form);
   void run(async()=>{
     switch(form.getAttribute('id')) {
       case 'editor-form': {
@@ -791,7 +799,7 @@ dialog.addEventListener('close',()=>{restoreData=null;importRows=null;});
 setInterval(tick,250);
 try {
   main.innerHTML='<p class="loading">Открываем «Мою кухню»…</p>';
-  const [ids,schema,exchangeSchema,db]=await Promise.all([json(recipeBase+'index.json'),json('./data/recipe.schema.json'),json('./data/exchange.schema.json'),openStorage()]);
+  const [ids,schema,exchangeSchema,db,aiSchema]=await Promise.all([json(recipeBase+'index.json'),json('./data/recipe.schema.json'),json('./data/exchange.schema.json'),openStorage(),json('./data/ai-result.schema.json')]);
   recipeSchema=schema;
   exchange=exchangeSchema.$defs;
   storage=db;
@@ -801,6 +809,7 @@ try {
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
   pantry=createPantry(pantryDialog,storage,savedPantry);
   featuredId='pilaf';
+  await ai.initialize(aiSchema);
   onRoute();
   tick();
   void setupWorker();

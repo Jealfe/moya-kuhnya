@@ -1,8 +1,9 @@
+import { validateAnalysisLinks } from './ai-links.js';
 export const formatNumber = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format;
 export const uid = () => globalThis.crypto.randomUUID();
 export const totalTime = recipe => recipe.prep + recipe.cook;
 export const initialState = () => ({
-  recipes:[], favorites:[], statuses:[], planned:null, shopping:[], shoppingBatches:[], history:[], session:null,
+  recipes:[], favorites:[], statuses:[], planned:null, shopping:[], shoppingBatches:[], history:[], aiAnalyses:[], session:null,
   settings:{theme:'dark',sound:true,wake:true}, goals:{monthly:0,new:0,retry:0}
 });
 
@@ -89,6 +90,12 @@ export function parseBackup(value,schema,legacySchema) {
   checked(validate(value,legacy ? legacySchema : schema));
   const data = legacy ? {...value.data,shoppingBatches:[]} : value.data;
   const errors = data.recipes.flatMap((recipe,index)=>recipeLinks(recipe,'$.data.recipes['+(index+1)+']'));
+  for (const entry of data.history) {
+    if (entry.recipeSnapshot) {
+      errors.push(...recipeLinks(entry.recipeSnapshot,'$.data.history.recipeSnapshot'));
+      if (entry.recipeSnapshot.id!==entry.recipeId) errors.push('Снимок рецепта не соответствует записи дневника.');
+    }
+  }
   for (const [key, records] of Object.entries({recipes:data.recipes, statuses:data.statuses, shopping:data.shopping, history:data.history})) {
     if (new Set(records.map(item=>item.id)).size !== records.length) errors.push('$.data.'+key+' — повторяются ID');
   }
@@ -104,7 +111,8 @@ export function parseBackup(value,schema,legacySchema) {
     if (new Set(timers.map(timer=>timer.id)).size !== timers.length) errors.push('$.data.session.timers — повторяются ID');
   }
   checked(errors);
-  return data;
+  validateAnalysisLinks(data);
+  return {...data,aiAnalyses:data.aiAnalyses??[]};
 }
 
 export const scaled = (ingredients, servings, original) =>

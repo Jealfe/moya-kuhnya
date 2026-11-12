@@ -8,6 +8,8 @@ Gradle 8.14.3 скачивается wrapper-скриптом автоматич
 ```sh
 npm ci
 npm test
+npx playwright install chromium
+npm run test:browser
 npm run build
 npm run android:sync
 npm run android:apk
@@ -48,3 +50,6 @@ Service Worker работает только в браузере. В APK инт�
 - Импорт рецепта, экспорт рецепта и полной копии, восстановление копии из Chrome.
 - Выбор фото из галереи и файлового менеджера, отмена выбора и сохранения.
 - Установка обновления поверх старой версии с сохранением данных.
+
+Нативные тесты и lint: `cd android && ./gradlew :app:testDebugUnitTest :app:lintDebug`.
+Для своей установленной версии Chromium: `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium npm run test:browser`.

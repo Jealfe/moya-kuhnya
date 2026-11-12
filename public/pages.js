@@ -49,7 +49,7 @@ export function catalogResults(state,recipes,filters) {
   document.querySelector('#recipe-count').textContent='Найдено: '+matches.length;
   document.querySelector('#recipe-results').innerHTML=matches.length?matches.map(recipe=>card(recipe,state)).join(''):empty('Ничего не найдено','Попробуйте изменить поиск или фильтры.');
 }
-export function recipePage(state,recipe,servings,preview=false,fromPantry=false) {
+export function recipePage(state,recipe,servings,preview=false,fromPantry=false,ai=null) {
   const favorite=state.favorites.includes(recipe.id);
   const planned=state.planned===recipe.id;
   const history=ordered(state.history.filter(entry=>entry.recipeId===recipe.id));
@@ -64,7 +64,7 @@ export function recipePage(state,recipe,servings,preview=false,fromPantry=false)
     '<div class="pills"><span>'+icon('time')+' Подготовка '+recipe.prep+' мин</span><span>'+icon('time')+' Готовка '+recipe.cook+' мин</span><span>Сложность '+recipe.difficulty+'/5</span></div>'+actions+
     (preview?'':'<div class="actions">'+button(favorite?'В избранном':'В избранное','favorite',{id:recipe.id,kind:favorite?'active':'',symbol:'heart'})+button(planned?'Убрать из плана':'Запланировать','plan',{id:recipe.id})+link('Редактировать','editor/'+recipe.id)+button('Экспорт','export-recipe',{id:recipe.id,symbol:'download'})+'</div>'+
     field('Статус блюда',select('recipe-status',Object.entries(statusLabels),statusFor(state,recipe.id),'data-id="'+h(recipe.id)+'"')))+
-    '</div></section><div class="detail-body"><section class="panel padded"><div class="section-heading"><h2>Ингредиенты</h2>'+
+    '</div></section>'+(preview?'':ai?.beforeCooking(recipe.id)??'')+'<div class="detail-body"><section class="panel padded"><div class="section-heading"><h2>Ингредиенты</h2>'+
     (preview?'<span>'+servings+' порций</span>':portionControl)+
     '</div>'+foodList(scaled(recipe.ingredients,servings,recipe.servings))+'<h3>Что понадобится</h3>'+list(recipe.tools)+'</section>'+
     '<section class="panel padded"><h2>План приготовления</h2><ol class="steps">'+recipe.steps.map(step=>'<li><details><summary>'+h(step.title)+'</summary><p>'+h(step.instruction)+'</p>'+(step.temperature?'<p class="muted">'+h(step.temperature)+'</p>':'')+'</details></li>').join('')+'</ol>'+
@@ -83,7 +83,7 @@ export function timerCard(timer, template) {
     button('Время','timer-edit',{id:timer.id})+button('Сброс','timer-reset',{id:timer.id,disabled:untouched})+'</div></div>';
 }
 
-export function cookPage(state,reportDraft) {
+export function cookPage(state,reportDraft,ai=null) {
   const session=state.session;
   if (!session) return empty('Готовка ещё не начата','Откройте рецепт, чтобы начать.',link('К рецептам','recipes',{kind:'primary'}));
   if (session.reporting) return reportPage({id:session.id,name:session.recipe.name,minutes:Math.round(duration(session)/60000)},reportDraft,true);
@@ -100,9 +100,11 @@ export function cookPage(state,reportDraft) {
     heading(recipe.name,servings+' порций · '+done.length+' из '+recipe.steps.length+' шагов отмечено',
       button(session.activeSince===null?'Продолжить':'Пауза готовки','cook-pause',{symbol:session.activeSince===null?'arrow':'pause'}))+
     (session.activeSince===null?'<div class="info">Готовка на паузе. Уже запущенные таймеры продолжают отсчёт.</div>':'')+
+    (ai?.beforeCooking(recipe.id)??'')+
     '<div class="step-nav" aria-label="Шаги">'+recipe.steps.map((_,i)=>button(String(i+1)+(done.includes(i)?' ✓':''),'cook-step',{id:i,kind:i===index?'primary':''})).join('')+'</div>'+
     '<div class="cook-layout"><section class="panel cook-step padded"><div class="kicker">Шаг '+(index+1)+' из '+recipe.steps.length+'</div><h2>'+h(step.title)+'</h2><p class="instruction">'+h(step.instruction)+'</p>'+
     (step.temperature?'<div class="info">'+h(step.temperature)+'</div>':'')+(step.ready?'<div class="note"><strong>Как понять, что готово</strong><p>'+h(step.ready)+'</p></div>':'')+
+    (ai?.stepAdvice(recipe.id,index)??'')+
     (step.parallel?'<div class="note"><strong>Параллельно</strong><p>'+h(step.parallel)+'</p></div>':'')+
     (timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+
@@ -153,7 +155,7 @@ export function shoppingPage(state) {
 }
 
 export const goalLabels = {monthly:'Приготовлений за месяц',new:'Новых блюд за месяц',retry:'Повторить неудачные блюда'};
-export function historyPage(state,recipeId,period) {
+export function historyPage(state,recipeId,period,ai=null) {
   const history=ordered(state.history);
   const entries=recipeId?history.filter(item=>item.recipeId===recipeId):history;
   const pending=entries.filter(entry=>entry.pending);
@@ -171,13 +173,13 @@ export function historyPage(state,recipeId,period) {
     '<section><div class="section-heading"><h2>Попытки</h2></div>'+(entries.length?'<div class="entry-grid">'+entries.map(entry=>'<article class="panel entry">'+
     (entry.image?photo(entry.image,'Фото готового блюда «'+entry.name+'»'):'')+'<div class="padded"><span class="kicker">'+h(dateLabel(entry.at))+'</span><h3>'+h(entry.name)+'</h3>'+
     '<div class="pills"><span>'+icon('star')+' '+impressionLabel(entry)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
-    notes(entry)+'<div class="actions">'+(entry.pending?link('Оценить','impression/'+entry.id,{kind:'primary'}):'')+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
+    notes(entry)+'<div class="actions">'+(ai?.entryControls(entry)??'')+(entry.pending?link('Оценить','impression/'+entry.id,{kind:'primary'}):'')+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
     button('Удалить запись','history-delete',{id:entry.id,kind:'quiet danger'})+'</div></div></article>').join('')+'</div>':
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }
 
-export function settingsPage(state, offline, install) {
-  return heading('Настройки','Оформление, таймеры и данные на этом устройстве.')+
+export function settingsPage(state, offline, install,ai=null) {
+  return heading('Настройки','Оформление, таймеры и данные на этом устройстве.')+(ai?.settings()??'')+
     '<div class="duo"><section class="panel padded form-stack"><h2>Приложение</h2>'+
     field('Тема',select('theme',[['dark','Тёмная'],['light','Светлая']],state.settings.theme))+
     '<label class="toggle"><input type="checkbox" name="sound" '+(state.settings.sound?'checked':'')+'> Звуковой сигнал таймеров</label>'+
