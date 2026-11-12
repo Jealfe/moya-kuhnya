@@ -24,14 +24,18 @@ export function home(state, recipes, featured) {
 
 export function catalog(state,recipes,filters) {
   const categories=[...new Set(recipes.map(recipe=>recipe.category))];
-  return heading('Рецепты','Выберите блюдо или добавьте свой рецепт.',button('Проверить GitHub','check-github',{symbol:'history'})+button('Импорт','import',{symbol:'upload'})+link('Новый рецепт','editor',{kind:'primary',symbol:'plus'}))+
+  return heading('Рецепты','Выберите блюдо или добавьте свой рецепт.')+
     '<form id="filters" class="panel filter-panel"><div class="search">'+icon('search')+input('query',filters.query,'type="search" aria-label="Поиск рецептов" placeholder="Поиск по блюдам и продуктам"')+'</div><div class="filter-selects">'+
     field('Категория',select('category',[['','Все'],...categories.map(category=>[category,category])],filters.category))+
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
     '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label></div></form>'+
-    '<div class="section-heading"><p id="recipe-count" aria-live="polite"></p>'+button('Экспорт всех','export-all',{symbol:'download',kind:'quiet'})+'</div><div id="recipe-results" class="cards"></div>';
+    '<div class="section-heading catalog-toolbar"><p id="recipe-count" aria-live="polite"></p><div class="actions">'+
+    button('Экспорт всех','export-all',{symbol:'download',kind:'quiet'})+
+    '<details class="recipe-add-menu"><summary class="btn">'+icon('plus')+'Добавить рецепты</summary><div class="panel recipe-add-actions">'+
+    button('Проверить GitHub','check-github',{symbol:'history'})+button('Импорт','import',{symbol:'upload'})+
+    link('Новый рецепт','editor',{symbol:'plus'})+'</div></details></div></div><div id="recipe-results" class="cards"></div>';
 }
 export function catalogResults(state,recipes,filters) {
   const clean = value => value.toLocaleLowerCase('ru').replace(/ё/g,'е');

@@ -318,7 +318,15 @@ async function onAction(action,id) {
       return;
     case 'export-recipe': saveFile(id+'.json',recipe); return;
     case 'export-all': saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
-    case 'import': fileDialog('import'); return;
+    case 'import': {
+      const menu=document.querySelector('.recipe-add-menu[open]');
+      if (menu) {
+        menu.open=false;
+        menu.querySelector('summary').focus();
+      }
+      fileDialog('import');
+      return;
+    }
     case 'check-github': await checkGitHub(); return;
     case 'restore': fileDialog('restore'); return;
     case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
@@ -386,9 +394,19 @@ async function run(work) {
 }
 
 document.addEventListener('click',event=>{
+  const menu=document.querySelector('.recipe-add-menu[open]');
+  if (menu && !menu.contains(event.target)) menu.open=false;
   if (state) unlockSound();
   const control=event.target.closest('[data-do]');
   if (control) void run(()=>onAction(control.dataset.do,control.dataset.id));
+});
+document.addEventListener('keydown',event=>{
+  if (event.key!=='Escape' || dialog.open) return;
+  const menu=document.querySelector('.recipe-add-menu[open]');
+  if (menu) {
+    menu.open=false;
+    menu.querySelector('summary').focus();
+  }
 });
 document.addEventListener('input',event=>{
   const target=event.target;
