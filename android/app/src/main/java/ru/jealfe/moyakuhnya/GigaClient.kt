@@ -53,14 +53,18 @@ class GigaClient(
             "Учитывай температуры, время, прошлые попытки и отметки done/useful: исправленное не повторяй без оснований. " +
             "Не меняй рецепт. Не придумывай факты. При нехватке сведений задай максимум два вопроса. " +
             "Связывай проблемы с индексами шагов с нуля. Верни JSON по схеме: summary, issues (title, possibleCauses, " +
-            "recommendations, stepIndexes), nextTimeChecklist, questions. Если проблем нет, issues может быть пустым."
-        val body = JSONObject().put("model", model).put("stream", false).put("temperature", 0.3).put("max_tokens", 4096)
+            "recommendations, stepIndexes), nextTimeChecklist, questions. Если проблем нет, issues может быть пустым. " +
+            "Выведи только один JSON-объект: без Markdown, блоков кода и пояснений вне JSON. " +
+            "Используй двойные кавычки и экранируй переносы внутри строк. Точная JSON-схема ответа: " + schema.toString()
+        val body = JSONObject().put("model", model).put("stream", false).put("temperature", 0.1).put("max_tokens", 4096)
             .put("messages", JSONArray().put(JSONObject().put("role", "system").put("content", prompt))
                 .put(JSONObject().put("role", "user").put("content", payload.toString())))
             .put("response_format", JSONObject().put("type", "json_schema").put("schema", schema).put("strict", true))
         val choice = authorized("chat/completions", body).getJSONArray("choices").getJSONObject(0)
         if (choice.optString("finish_reason") != "stop") throw GigaFailure("ИИ не завершил ответ. Повторите анализ по кнопке.")
-        return choice.getJSONObject("message").getString("content")
+        val content = choice.getJSONObject("message").optString("content", "")
+        if (content.isBlank()) throw GigaFailure("ИИ вернул пустой ответ. Повторите анализ или выберите другую модель в настройках.")
+        return content
     }
     private fun ensureSuccess(code: Int) {
         if (code in 200..299) return

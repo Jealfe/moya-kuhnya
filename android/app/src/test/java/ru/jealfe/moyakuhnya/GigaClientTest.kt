@@ -50,6 +50,9 @@ class GigaClientTest {
                 assertEquals("json_schema",request.getJSONObject("response_format").getString("type"))
                 assertTrue(request.getJSONObject("response_format").getBoolean("strict"))
                 assertEquals(2,request.getJSONArray("messages").length())
+                val instructions=request.getJSONArray("messages").getJSONObject(0).getString("content")
+                assertTrue(instructions.contains("без Markdown"))
+                assertTrue(instructions.contains(request.getJSONObject("response_format").getJSONObject("schema").toString()))
                 GigaResponse(200,"""{"choices":[{"finish_reason":"stop","message":{"content":"{}"}}]}""")
             }
         },{"test-key"},{"GIGACHAT_API_PERS"})
@@ -61,5 +64,14 @@ class GigaClientTest {
             else GigaResponse(200,"""{"choices":[{"finish_reason":"length","message":{"content":"{"}}]}""")
         },{"test-key"},{"GIGACHAT_API_PERS"})
         assertThrows(GigaFailure::class.java){client.analyze(JSONObject(),JSONObject(),"GigaChat-2")}
+    }
+
+    @Test fun emptyContentHasAnActionableError() {
+        val client=GigaClient(GigaTransport { url,_,_ ->
+            if(url==GigaClient.OAUTH) GigaResponse(200,"""{"access_token":"token","expires_at":9999999999999}""")
+            else GigaResponse(200,"""{"choices":[{"finish_reason":"stop","message":{"content":"  "}}]}""")
+        },{"test-key"},{"GIGACHAT_API_PERS"})
+        val failure=assertThrows(GigaFailure::class.java){client.analyze(JSONObject(),JSONObject(),"GigaChat-2")}
+        assertTrue(failure.message!!.contains("пустой ответ"))
     }
 }

@@ -74,3 +74,27 @@ test('контекст ограничен целыми попытками, бо�
 test('контрольная сумма рецепта не зависит от изображения и порядка свойств',()=>{
  assert.deepEqual(recipeData({...recipe,image:'another image'}),recipeData(recipe));
 });
+
+test('JSON с BOM, Markdown-обёрткой и строковой сериализацией проходит ту же схему',()=>{
+ const text=JSON.stringify(result());
+ for(const response of [text,'\uFEFF '+text+'\n','```json\n'+text+'\n```','```JSON\r\n'+text+'\r\n```','```\n'+text+'\n```',JSON.stringify(text),JSON.stringify('```json\n'+text+'\n```')]) {
+  assert.deepEqual(parseAnalysis(response,schema,recipe.steps.length),result());
+ }
+});
+test('обёртка не позволяет сохранить повреждённый JSON или обойти проверку схемы',()=>{
+ for(const response of ['```json\n{"summary":"обрыв','Ответ: '+JSON.stringify(result()),JSON.stringify(JSON.stringify(JSON.stringify(result()))),'```js\nalert(1)\n```','```json\n{"summary":"ошибка",}\n```','```json\n'+JSON.stringify({...result(),questions:42})+'\n```']) {
+  assert.throws(()=>parseAnalysis(response,schema,recipe.steps.length));
+ }
+});
+test('ответ в блоке кода сохраняется после одного запроса без изменения отзыва',async()=>{
+ const state=initialState();state.history=[entry()];const original=structuredClone(state.history[0]);let requests=0;
+ const record=await analyzed(state,entry(),{request:async()=>{requests++;return {content:'```json\n'+JSON.stringify(result())+'\n```'};}});
+ storeAnalysis(state,record);assert.equal(requests,1);assert.deepEqual(state.aiAnalyses[0].result,result());assert.deepEqual(state.history[0],original);
+});
+test('диагностика ограничена ответом модели и не сохраняется в состояние после ошибки',async()=>{
+ const state=initialState();state.history=[entry()];
+ await assert.rejects(analyzed(state,entry(),{request:async()=>({content:'not-json'.repeat(3000)})}),error=>{
+  assert.equal(error.analysisResponse.length,12000);return true;
+ });
+ assert.deepEqual(state.aiAnalyses,[]);assert.equal(JSON.stringify(state).includes('not-json'),false);
+});

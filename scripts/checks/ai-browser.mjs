@@ -12,7 +12,7 @@ await context.addInitScript(()=>{
  cancel:async()=>{window.__calls.cancel++;window.__reject?.(Error('Запрос отменён.'));},
  analyze:async({payload})=>{window.__calls.analyze++;window.__payload=payload;
  if(window.__slow)return new Promise((_,reject)=>window.__reject=reject);
- return {content:window.__invalid?'broken-json':JSON.stringify({summary:'Учитывайте мягкость мяса',issues:[{title:'Жёсткое мясо',possibleCauses:['Возможно, мало времени тушения'],recommendations:['Проверять мягкость перед следующим шагом'],stepIndexes:[0]}],nextTimeChecklist:['Проверить отруб'],questions:[]})};}
+ return {content:window.__invalid?'broken-json':'```json\n'+JSON.stringify({summary:'Учитывайте мягкость мяса',issues:[{title:'Жёсткое мясо',possibleCauses:['Возможно, мало времени тушения'],recommendations:['Проверять мягкость перед следующим шагом'],stepIndexes:[0]}],nextTimeChecklist:['Проверить отруб'],questions:[]})+'\n```'};}
  },KitchenFiles:{save:async({content})=>{window.__backup=JSON.parse(content);return {saved:true};}}}};
 });
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -30,7 +30,7 @@ await page.locator('#dialog [data-do="dialog-close"]').click();await page.goto('
 await page.locator('[data-do="start"]').click();await page.locator('.cook-step .ai-advice').waitFor();
 await page.locator('[data-do="ai-done"]').first().click();await page.waitForFunction(()=>!document.querySelector('.cook-step .ai-advice'));assert.equal(await page.evaluate(()=>window.__calls.analyze),1);
 await page.goto('http://127.0.0.1:4174/#/history/pilaf');await page.locator('[data-do="ai-view"]').click();await page.locator('#dialog .ai-issue').waitFor();assert.equal(await page.evaluate(()=>window.__calls.analyze),1);
-await page.locator('#dialog [data-do="dialog-close"]').click();await page.evaluate(()=>window.__invalid=true);await page.locator('main [data-do="ai-repeat"]').click();await page.locator('#dialog').getByText('ИИ вернул невалидный JSON.',{exact:false}).waitFor();
+await page.locator('#dialog [data-do="dialog-close"]').click();await page.evaluate(()=>window.__invalid=true);await page.locator('main [data-do="ai-repeat"]').click();await page.locator('#dialog').getByText('ИИ вернул невалидный JSON.',{exact:false}).waitFor();await page.locator('#dialog summary').filter({hasText:'Показать ответ ИИ'}).click();assert.equal(await page.locator('#dialog [name="ai-response"]').inputValue(),'broken-json');
 await page.locator('#dialog [data-do="dialog-close"]').click();await page.evaluate(()=>{window.__invalid=false;window.__slow=true;});await page.locator('main [data-do="ai-repeat"]').click();await page.locator('[data-do="ai-cancel"]').waitFor();await page.locator('[data-do="ai-cancel"]').click();await page.locator('#dialog').getByText('Запрос отменён.',{exact:true}).waitFor();
 await page.locator('#dialog [data-do="dialog-close"]').click();await page.goto('http://127.0.0.1:4174/#/settings');await page.locator('[data-do="backup"]').click();await page.waitForFunction(()=>!!window.__backup);
 const backup=await page.evaluate(()=>window.__backup);assert.equal(backup.data.aiAnalyses.length,1);assert.equal(backup.data.aiAnalyses[0].feedback[0].useful,true);assert.ok(!JSON.stringify(backup).includes('dGVzdDpzZWNyZXQ='));

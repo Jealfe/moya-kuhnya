@@ -60,7 +60,8 @@ function showDialog(title,content) {
 function confirmAction(title,message,label,action,id='') {
   showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+button('Отмена','dialog-close')+'</div>');
 }
-const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>');
+const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>'+
+  (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
 async function change(mutate) {
   state=await storage.change(current=>{mutate(current); return current;});
   await ai.refreshAdvice();

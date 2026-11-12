@@ -1,4 +1,4 @@
-import { validate } from './core.js';
+import { parseJsonText, validate } from './core.js';
 
 // Whitelists are deliberate: photos, credentials, unrelated dishes and app settings
 // never enter the model context or its fingerprint.
@@ -20,10 +20,23 @@ export async function fingerprint(value) {
 }
 export function parseAnalysis(text,schema,stepCount=45) {
   let result;
-  try {result=typeof text==='string'?JSON.parse(text):structuredClone(text);} catch {throw Error('ИИ вернул невалидный JSON. Повторите анализ по кнопке.');}
+  try {
+    result=typeof text==='string'?parseJsonText(text):structuredClone(text);
+    // Some responses contain a JSON string containing the actual object. Unwrap
+    // at most once, then apply exactly the same schema and step validation.
+    if (typeof result==='string') result=parseJsonText(result);
+  } catch {
+    const error=Error('ИИ вернул невалидный JSON. Повторите анализ по кнопке.');
+    // Only the model's text, never the API response/headers/key. Kept transiently
+    // for the on-device error details, not saved to state, backups or logs.
+    if (typeof text==='string') error.analysisResponse=text.slice(0,12000);
+    throw error;
+  }
   const errors=validate(result,schema);
   if (errors.length || result.issues.some(issue=>new Set(issue.stepIndexes).size!==issue.stepIndexes.length || issue.stepIndexes.some(index=>index>=stepCount))) {
-    throw Error('Ответ ИИ не соответствует схеме или ссылается на неизвестный шаг. Повторите анализ по кнопке.');
+    const error=Error('Ответ ИИ не соответствует схеме или ссылается на неизвестный шаг. Повторите анализ по кнопке.');
+    if (typeof text==='string') error.analysisResponse=text.slice(0,12000);
+    throw error;
   }
   return result;
 }
