@@ -98,3 +98,18 @@ test('диагностика ограничена ответом модели и
  });
  assert.deepEqual(state.aiAnalyses,[]);assert.equal(JSON.stringify(state).includes('not-json'),false);
 });
+
+test('повторный анализ старой попытки не вытесняет советы последней готовки',async()=>{
+ const state=initialState();state.history=[entry('old',1000),entry('recent',3000)];
+ const recent=await analyzed(state,state.history[1],{now:()=>4000});storeAnalysis(state,recent);
+ const old=await analyzed(state,state.history[0],{now:()=>9000});storeAnalysis(state,old);
+ assert.equal((await currentAdvice(state,recipe)).id,recent.id);
+});
+test('план и шаги исключают выполненные советы, включая частичное выполнение',async()=>{
+ const {advicePlan}=await import('../public/ai.js');const state=initialState();state.history=[entry()];const record=await analyzed(state);
+ record.result.issues[0].recommendations.push('Добавлять жидкость понемногу');
+ record.feedback=[{issueIndex:0,recommendationIndex:0,done:true,useful:true}];
+ assert.deepEqual(advicePlan(record).map(item=>item.text),['Добавлять жидкость понемногу']);
+ assert.deepEqual(adviceForStep(record,0).map(item=>item.text),['Добавлять жидкость понемногу']);
+ record.feedback.push({issueIndex:0,recommendationIndex:1,done:true,useful:false});assert.deepEqual(advicePlan(record),[]);
+});

@@ -9,5 +9,11 @@
   "server": {
     "androidScheme": "https"
   },
-  "loggingBehavior": "none"
+  "loggingBehavior": "none",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "contain"
+    }
+  }
 }

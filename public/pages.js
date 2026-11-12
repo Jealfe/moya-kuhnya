@@ -100,11 +100,10 @@ export function cookPage(state,reportDraft,ai=null) {
     heading(recipe.name,servings+' порций · '+done.length+' из '+recipe.steps.length+' шагов отмечено',
       button(session.activeSince===null?'Продолжить':'Пауза готовки','cook-pause',{symbol:session.activeSince===null?'arrow':'pause'}))+
     (session.activeSince===null?'<div class="info">Готовка на паузе. Уже запущенные таймеры продолжают отсчёт.</div>':'')+
-    (ai?.beforeCooking(recipe.id)??'')+
+    (ai?.beforeCooking(recipe.id,true)??'')+
     '<div class="step-nav" aria-label="Шаги">'+recipe.steps.map((_,i)=>button(String(i+1)+(done.includes(i)?' ✓':''),'cook-step',{id:i,kind:i===index?'primary':''})).join('')+'</div>'+
-    '<div class="cook-layout"><section class="panel cook-step padded"><div class="kicker">Шаг '+(index+1)+' из '+recipe.steps.length+'</div><h2>'+h(step.title)+'</h2><p class="instruction">'+h(step.instruction)+'</p>'+
+    '<div class="cook-layout"><section class="panel cook-step padded"><div class="kicker">Шаг '+(index+1)+' из '+recipe.steps.length+'</div><h2>'+h(step.title)+'</h2>'+(ai?.stepAdvice(recipe.id,index)??'')+'<p class="instruction">'+h(step.instruction)+'</p>'+
     (step.temperature?'<div class="info">'+h(step.temperature)+'</div>':'')+(step.ready?'<div class="note"><strong>Как понять, что готово</strong><p>'+h(step.ready)+'</p></div>':'')+
-    (ai?.stepAdvice(recipe.id,index)??'')+
     (step.parallel?'<div class="note"><strong>Параллельно</strong><p>'+h(step.parallel)+'</p></div>':'')+
     (timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+

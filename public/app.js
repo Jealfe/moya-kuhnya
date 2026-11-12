@@ -8,6 +8,7 @@ import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input,
 import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
+document.documentElement.dataset.platform=isAndroid()?'android':'web';
 const main=document.querySelector('main');
 const header=document.querySelector('#header');
 const navigation=document.querySelector('#navigation');

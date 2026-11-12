@@ -1,18 +1,21 @@
 import { isAndroid, nativePlugin } from './native.js';
-import { adviceForStep, analysisStale, createAnalysis, currentAdvice, latestAnalysis, recipeForEntry, reviewData, fingerprint, storeAnalysis } from './ai.js';
+import { advicePlan, adviceForStep, analysisStale, createAnalysis, currentAdvice, latestAnalysis, recipeForEntry, reviewData, fingerprint, storeAnalysis } from './ai.js';
 import { button, dateLabel, field, h, input, list, select } from './ui.js';
 
 export function createAi({getState,findRecipe,change,render,showDialog,showError}) {
   let status={hasKey:false,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'},connectionStatus='Подключение ещё не проверено.',models=[];
   let busyEntry=null,settingsBusy=false,requestCancelled=false,schema;
   const advice=new Map();
+  let sessionAdvice=null;
   const native=()=>nativePlugin('GigaChat');
   async function refreshAdvice() {
     advice.clear();
+    sessionAdvice=null;
     for (const id of new Set((getState().aiAnalyses??[]).map(record=>record.recipeId))) {
       const record=await currentAdvice(getState(),findRecipe(id));
       if (record) advice.set(id,record);
     }
+    if (getState().session) sessionAdvice=await currentAdvice(getState(),getState().session.recipe);
   }
   async function initialize(resultSchema) {
     schema=resultSchema;
@@ -66,17 +69,22 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       (result.questions.length?'<h3>Что уточнить</h3>'+list(result.questions)+'<p class="muted">Уточнения можно сохранить в заметках следующей попытки — они будут учтены при новом анализе.</p>':'')+
       (isAndroid()?button('Повторить анализ','ai-repeat',{id:entryId,disabled:busyEntry!==null||settingsBusy}):''));
   }
-  function beforeCooking(recipeId) {
-    const record=advice.get(recipeId);
-    if (!record) return '';
-    const pending=record.result.issues.flatMap((issue,i)=>issue.recommendations.map((text,j)=>({text,done:record.feedback.find(f=>f.issueIndex===i&&f.recommendationIndex===j)?.done}))).filter(item=>!item.done);
-    // Use the last analysis only, and hide a completed plan.
-    const checklist=pending.length || !record.result.issues.length?record.result.nextTimeChecklist:[];
-    return checklist.length?'<section class="panel padded ai-advice"><h2>На что обратить внимание в этот раз</h2>'+list(checklist.slice(0,6))+'</section>':'';
+  function beforeCooking(recipeId,compact=false) {
+    const record=compact?sessionAdvice:advice.get(recipeId);
+    if (!record || record.recipeId!==recipeId) return '';
+    const items=advicePlan(record);
+    if (!items.length) return '';
+    const body='<ul class="ai-plan-list">'+items.slice(0,6).map(item=>'<li>'+h(item.text)+
+      (item.stepIndexes.length?'<small>Шаги '+item.stepIndexes.map(index=>index+1).join(', ')+'</small>':'')+'</li>').join('')+'</ul>'+
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'});
+    return compact?'<details class="panel padded ai-advice ai-plan"><summary>На что обратить внимание в этот раз <span aria-label="Активных советов: '+items.length+'">'+items.length+'</span></summary>'+body+'</details>':
+      '<section class="panel padded ai-advice"><h2>На что обратить внимание в этот раз</h2>'+body+'</section>';
   }
   function stepAdvice(recipeId,index) {
-    const record=advice.get(recipeId),items=adviceForStep(record,index);
-    return items.length?'<div class="note ai-advice"><h3>Советы из прошлой попытки</h3>'+items.map(item=>'<p>'+h(item.text)+'</p>'+feedbackButtons(record,item.issueIndex,item.recommendationIndex)).join('')+'</div>':'';
+    const record=sessionAdvice?.recipeId===recipeId?sessionAdvice:null,items=adviceForStep(record,index);
+    return items.length?'<section class="ai-advice ai-step" aria-label="Советы ИИ для текущего шага"><span class="kicker">Из прошлой готовки · ИИ</span><h3>На этом шаге обратите внимание</h3>'+items.map(item=>
+      '<div class="ai-step-item"><strong>'+h(item.title)+'</strong><p>'+h(item.text)+'</p>'+feedbackButtons(record,item.issueIndex,item.recommendationIndex)+'</div>').join('')+
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'})+'</section>':'';
   }
   async function analyze(entryId,repeat=false) {
     if (busyEntry!==null||settingsBusy) return;
@@ -130,6 +138,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       }
       case 'ai-done':
       case 'ai-useful': {
+        const inlineDone=action==='ai-done' && location.hash==='#/cook' && !document.querySelector('#dialog')?.open;
         const [recordId,i,j]=id.split(':');let entryId;
         await change(state=>{
           const record=state.aiAnalyses?.find(item=>item.id===recordId);
@@ -141,6 +150,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
         });
         render();
         if(document.querySelector('#dialog')?.open)await showResult(entryId);
+        else if(inlineDone)document.querySelector('.cook-step')?.scrollIntoView({block:'start'});
         return;
       }
     }

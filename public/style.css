@@ -316,3 +316,20 @@ dialog .detail-body {margin-top:15px}
 .ai-issue .actions {margin-top:8px}
 .ai-advice {margin-bottom:18px}
 #ai-settings input[type=password] {font-family:monospace}
+
+/* SystemBars keeps the entire Android WebView inside status/cutout/navigation insets. */
+html[data-platform=android] body {padding-top:6px}
+.ai-plan > summary {display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:650;min-height:44px}
+.ai-plan > summary span {border-radius:20px;background:var(--chip);color:var(--olive);padding:4px 10px}
+.ai-plan-list {padding-left:22px;line-height:1.6}
+.ai-plan-list li {margin:12px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.ai-plan-list small {display:block;color:var(--muted);white-space:normal}
+.ai-step {margin:20px 0;padding:18px;border:1px solid var(--olive);border-left:4px solid var(--olive);border-radius:14px;background:var(--chip)}
+.ai-step h3 {margin-top:8px;font-size:1.2rem}
+.ai-step-item {padding-top:14px}
+.ai-step-item + .ai-step-item {margin-top:14px;border-top:1px solid var(--line)}
+.ai-step-item p {white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 12px;line-height:1.65}
+.ai-step .actions {flex-wrap:wrap}
+.ai-step .actions .btn {min-height:44px}
+.ai-plan > summary::after {content:'⌄';color:var(--olive);font-size:1.2rem}
+.ai-plan[open] > summary::after {content:'⌃'}

@@ -72,14 +72,23 @@ export function storeAnalysis(state,record) {
 export async function currentAdvice(state,recipe) {
   if (!recipe) return null;
   // The latest analysed attempt supersedes older advice; do not merge an endless list.
-  const record=[...(state.aiAnalyses??[])].filter(item=>item.recipeId===recipe.id).sort((a,b)=>b.at-a.at)[0];
+  const entries=new Map(state.history.map(entry=>[entry.id,entry]));
+  const record=[...(state.aiAnalyses??[])].filter(item=>item.recipeId===recipe.id && entries.has(item.entryId))
+    .sort((a,b)=>entries.get(b.entryId).at-entries.get(a.entryId).at || b.at-a.at)[0];
   if (!record) return null;
   const entry=state.history.find(item=>item.id===record.entryId);
   if (!entry || await analysisStale(record,entry,recipe)) return null;
   return record;
 }
+export function advicePlan(record) {
+  if (!record) return [];
+  const recommendations=record.result.issues.flatMap((issue,i)=>issue.recommendations.map((text,j)=>({
+    text,title:issue.title,stepIndexes:issue.stepIndexes,issueIndex:i,recommendationIndex:j,
+    ...record.feedback.find(item=>item.issueIndex===i && item.recommendationIndex===j)
+  })));
+  return recommendations.length?recommendations.filter(item=>!item.done):record.result.nextTimeChecklist.map(text=>({text,stepIndexes:[]}));
+}
 export function adviceForStep(record,index) {
   if (!record) return [];
-  return record.result.issues.flatMap((issue,i)=>issue.stepIndexes.includes(index)?issue.recommendations.map((text,j)=>({text,issueIndex:i,recommendationIndex:j,
-    ...record.feedback.find(item=>item.issueIndex===i && item.recommendationIndex===j)})).filter(item=>!item.done):[]).slice(0,5);
+  return advicePlan(record).filter(item=>item.stepIndexes.includes(index)).slice(0,5);
 }
