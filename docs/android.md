@@ -53,3 +53,8 @@ Service Worker работает только в браузере. В APK инт�
 
 Нативные тесты и lint: `cd android && ./gradlew :app:testDebugUnitTest :app:lintDebug`.
 Для своей установленной версии Chromium: `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium npm run test:browser`.
+
+В GitHub Actions workflow **Android APK** сохраняет APK как артефакт `moya-kuhnya-debug`.
+Откройте запуск workflow → Artifacts → скачайте и распакуйте ZIP. Для скачивания нужно
+войти в GitHub. Каждый чистый CI-runner создаёт собственную debug-подпись; для постоянных
+обновлений собирайте локально с сохранённым keystore или настройте постоянную подпись CI.
