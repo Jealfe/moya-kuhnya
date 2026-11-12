@@ -1,7 +1,7 @@
 import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
-import { area, button, clock, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
+import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
 import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
@@ -376,6 +376,30 @@ async function onAction(action,id) {
     case 'report-back': await changeSession(session=>{session.reporting=false; session.activeSince=Date.now();}); break;
     case 'cook-cancel': confirmAction('Отменить готовку?','Шаги и таймеры этой попытки будут удалены.','Отменить готовку','cook-discard'); return;
     case 'cook-discard': await changeSession((session,current)=>{current.session=null;}); dialog.close(); navigate('home'); return;
+    case 'history-delete': {
+      const entry=state.history.find(item=>item.id===id);
+      if (!entry) return;
+      confirmAction('Удалить запись?',
+        '«'+entry.name+'», '+dateLabel(entry.at)+'. Запись, оценка, заметки и фото будут удалены из истории.',
+        'Удалить запись','history-delete-confirm',id);
+      return;
+    }
+    case 'history-delete-confirm': {
+      let removed=false;
+      await change(current=>{
+        const index=current.history.findIndex(entry=>entry.id===id);
+        if (index!==-1) {
+          current.history.splice(index,1);
+          removed=true;
+        }
+      });
+      dialog.close();
+      say(removed?'Запись удалена из истории':'Запись уже удалена');
+      const [page,recipeId]=route();
+      if (page==='history' && recipeId && !state.history.some(entry=>entry.recipeId===recipeId)) navigate('history');
+      else render({focus:true});
+      return;
+    }
     case 'goals':
       showDialog('Цели на месяц','<form class="form-stack" id="goals-form"><p class="muted">Укажите 0, чтобы отключить цель. Неудачной считается попытка с оценкой 1–2 или ответом «Нет» на вопрос о повторе.</p>'+
         Object.entries(goalLabels).map(([key,label])=>field(label,input(key,state.goals[key],'type="number" min="0" max="100" required'))).join('')+

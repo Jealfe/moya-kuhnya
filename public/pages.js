@@ -159,7 +159,8 @@ export function historyPage(state,recipeId,period) {
     '<section><div class="section-heading"><h2>Попытки</h2></div>'+(entries.length?'<div class="entry-grid">'+entries.map(entry=>'<article class="panel entry">'+
     (entry.image?photo(entry.image,'Фото готового блюда «'+entry.name+'»'):'')+'<div class="padded"><span class="kicker">'+h(dateLabel(entry.at))+'</span><h3>'+h(entry.name)+'</h3>'+
     '<div class="pills"><span>'+icon('star')+' '+ratingLabel(entry.rating)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
-    notes(entry)+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+'</div></article>').join('')+'</div>':
+    notes(entry)+'<div class="actions">'+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
+    button('Удалить запись','history-delete',{id:entry.id,kind:'quiet danger'})+'</div></div></article>').join('')+'</div>':
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }
 

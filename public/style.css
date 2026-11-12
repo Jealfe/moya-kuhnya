@@ -209,6 +209,7 @@ fieldset {min-width:0}
 .entry {overflow:hidden}
 .entry .photo {height:200px}
 .entry h3 {margin:8px 0}
+.entry .actions {margin-top:8px}
 dialog {max-height:calc(100dvh - 35px);width:min(700px,calc(100% - 25px));padding:clamp(14px,3vw,26px);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto}
 dialog::backdrop {background:#0a0a08bc}
 .dialog-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
