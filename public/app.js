@@ -1,3 +1,4 @@
+import { isAndroid } from './native.js';
 import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
@@ -21,7 +22,7 @@ let state, storage, builtins, recipeSchema, exchange, featuredId;
 let pantry, drafts, deletedBatch=null, checkingGitHub=false;
 let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
-let pendingUpdate=false, offlineReady=false, timerSignature='';
+let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
@@ -417,8 +418,8 @@ async function onAction(action,id) {
       await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
       say('Блюдо добавлено отдельным списком');
       return;
-    case 'export-recipe': saveFile(id+'.json',recipe); return;
-    case 'export-all': saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
+    case 'export-recipe': await saveFile(id+'.json',recipe); return;
+    case 'export-all': await saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
     case 'import': {
       const menu=document.querySelector('.recipe-add-menu[open]');
       if (menu) {
@@ -429,7 +430,7 @@ async function onAction(action,id) {
       return;
     }
     case 'restore': fileDialog('restore'); return;
-    case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
+    case 'backup': await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
     case 'restore-confirm': {
       const snapshot=restoreData;
       if (!snapshot) return;
@@ -642,7 +643,7 @@ document.addEventListener('submit',event=>{
         if (draftKey===key) draft=saved;
         parseRecipes(saved,recipeSchema,exchange.bundle);
         if (event.submitter?.value==='preview') {showDialog('Предпросмотр рецепта',recipePage(state,saved,saved.servings,true));return;}
-        if (event.submitter?.value==='export') {saveFile(saved.id+'.json',saved);return;}
+        if (event.submitter?.value==='export') {await saveFile(saved.id+'.json',saved);return;}
         await change(current=>{
           const recipes=[...current.recipes.filter(item=>item.id!==saved.id),saved];
           if (recipes.length>1000) throw Error('В локальном каталоге помещается до 1000 добавленных рецептов.');
@@ -758,7 +759,7 @@ function softRender() {
   if (state && !main.querySelector('#editor-form,#report-form') && !dialog.open && !pantryDialog.open) render();
 }
 async function setupWorker() {
-  if (!('serviceWorker' in navigator) || document.documentElement.dataset.build!=='production') return;
+  if (isAndroid() || !('serviceWorker' in navigator) || document.documentElement.dataset.build!=='production') return;
   try {
     const wasControlled=Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener('controllerchange',()=>{

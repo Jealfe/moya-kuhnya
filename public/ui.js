@@ -1,3 +1,4 @@
+import { isAndroid, nativePlugin } from './native.js';
 import { amount, formatNumber, totalTime } from './core.js';
 
 export const h = value => String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -88,7 +89,11 @@ export const foodList = items => '<ul class="ingredients">'+items.map(item=>'<li
 export const stat = (label,value,symbol) => '<div class="stat panel"><span class="stat-icon">'+icon(symbol)+'</span><div><strong>'+h(value)+'</strong><span>'+h(label)+'</span></div></div>';
 export const ratingLabel = rating => rating ? formatNumber(rating)+' / 5' : 'Без оценки';
 export const clock = seconds => [Math.floor(seconds/60),seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
-export function saveFile(name,value) {
+export async function saveFile(name,value) {
+  if (isAndroid()) {
+    await nativePlugin('KitchenFiles').save({name,content:JSON.stringify(value,null,2)});
+    return;
+  }
   const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
   const a=document.createElement('a');
   a.href=url; a.download=name; a.click();
