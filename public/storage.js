@@ -31,8 +31,21 @@ export async function openStorage() {
       };
     });
   }
+  function draftRequest(mode,operate) {
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('data',mode);
+      const request=operate(tx.objectStore('data'));
+      tx.oncomplete=()=>resolve(request.result);
+      tx.onabort=()=>reject(tx.error ?? new Error('Черновик не сохранён.'));
+    });
+  }
   return {
     read: () => transaction('readonly',state=>state),
-    change: mutate => transaction('readwrite',mutate)
+    change: mutate => transaction('readwrite',mutate),
+    readDrafts: async () => Object.fromEntries((await draftRequest('readonly',store=>
+      store.getAll(IDBKeyRange.bound('draft/','draft0',false,true)))).map(({id,value})=>[id,value])),
+    saveDraft: (id,value) => draftRequest('readwrite',store=>value===null
+      ? store.delete('draft/'+id)
+      : store.put({id,value},'draft/'+id))
   };
 }

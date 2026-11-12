@@ -573,6 +573,7 @@
                     "maxLength": 80,
                     "pattern": "^[a-z0-9][a-z0-9_-]*$"
                   },
+                  "automatic": { "type": "boolean" },
                   "status": {
                     "enum": [
                       "tried",
@@ -688,6 +689,7 @@
                     "minimum": 0,
                     "maximum": 1000000
                   },
+                  "pending": { "type": "boolean" },
                   "rating": {
                     "type": "integer",
                     "minimum": 0,

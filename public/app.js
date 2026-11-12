@@ -2,7 +2,7 @@ import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, pars
 import { openStorage } from './storage.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
 import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
-import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, settingsPage, shoppingPage, timerCard } from './pages.js';
+import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
 const main=document.querySelector('main');
@@ -16,10 +16,10 @@ const recipeBase='./data/recipes/';
 const filters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
+let drafts, deletedBatch=null, checkingGitHub=false;
 let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=false, timerSignature='';
-let routeValue='';
 const announced=new Set();
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
@@ -27,13 +27,29 @@ const navigate = (path) => { location.hash='/'+path; };
 const catalogItems = () => [...new Map([...builtins,...state.recipes].map(recipe=>[recipe.id,recipe])).values()];
 const findRecipe = id => catalogItems().find(recipe=>recipe.id===id);
 const getPortions = recipe => portions.get(recipe.id) ?? recipe.servings;
-function say(message) {
+function persistDraft(key,value) {
+  if (value===null) delete drafts[key]; else drafts[key]=structuredClone(value);
+  void storage.saveDraft(key,value).catch(()=>say('Не удалось сохранить черновик на устройстве.'));
+}
+function saveReportDraft(form) {
+  const key='report/'+form.dataset.entry;
+  const {minutes,again,rating,good,errors,next}=Object.fromEntries(new FormData(form));
+  const image=form.elements.image.files[0] || drafts[key]?.image;
+  persistDraft(key,{minutes,again,rating,good,errors,next,image:image?.size<=35*1024*1024?image:undefined});
+  const label=form.querySelector('.draft-photo');
+  if (image?.size) {
+    label.hidden=false;
+    label.textContent=image.name;
+  }
+}
+function say(message,undo=false) {
   clearTimeout(noticeTimeout);
   notice.textContent=message;
-  noticeTimeout=setTimeout(()=>{notice.textContent='';},5500);
+  if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'quiet'}));
+  noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?10000:5500);
 }
 function showDialog(title,content) {
-  dialog.innerHTML='<div class="dialog-heading"><h2>'+h(title)+'</h2>'+button('Закрыть','dialog-close',{kind:'quiet',symbol:'close'})+'</div>'+content;
+  dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+button('Закрыть','dialog-close',{kind:'quiet',symbol:'close'})+'</div>'+content;
   if (!dialog.open) dialog.showModal();
 }
 function confirmAction(title,message,label,action,id='') {
@@ -54,7 +70,7 @@ async function changeSession(mutate) {
 function render({focus=false}={}) {
   if (!state) return;
   const [page,id]=route();
-  const tab=['recipe','editor','cook'].includes(page)?'recipes':page;
+  const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
   document.documentElement.dataset.theme=state.settings.theme;
   document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#181a15':'#f6f2e8';
   const recipes=catalogItems();
@@ -69,16 +85,24 @@ function render({focus=false}={}) {
   switch(page) {
     case 'home': main.innerHTML=home(state,recipes,findRecipe(featuredId) ?? recipes[0]); break;
     case 'recipes':
-      main.innerHTML=catalog(state,recipes,filters);
+      main.innerHTML=catalog(recipes,filters,checkingGitHub);
       catalogResults(state,recipes,filters);
       break;
     case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe)):unavailable(); break;
     case 'editor':
       if (id && !recipe) { main.innerHTML=unavailable(); break; }
-      if (draftKey!==(id??'')) { draft=recipe?structuredClone(recipe):newRecipe(); draftKey=id??''; }
-      main.innerHTML=editor(draft,id);
+      if (draftKey!==(id??'')) {
+        draftKey=id??'';
+        draft=structuredClone(drafts['editor/'+draftKey] ?? (recipe??newRecipe()));
+      }
+      main.innerHTML=editor(draft,id,drafts['editor-photo/'+draftKey]);
       break;
-    case 'cook': main.innerHTML=cookPage(state); break;
+    case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id]); break;
+    case 'impression': {
+      const entry=state.history.find(item=>item.id===id && item.pending);
+      main.innerHTML=entry?reportPage(entry,drafts['report/'+id]):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
+      break;
+    }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
     case 'history': main.innerHTML=historyPage(state,id,period); break;
     case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent)); break;
@@ -93,9 +117,11 @@ function render({focus=false}={}) {
 }
 
 function onRoute() {
-  if (routeValue.startsWith('#/editor') && location.hash!==routeValue) {draft=null; draftKey=null;}
-  routeValue=location.hash;
+  if (route()[0]!=='editor') {draft=null; draftKey=null;}
   render({focus:true});
+}
+function nextCountdown(timers,now=Date.now()) {
+  return Math.min(...timers.filter(timer=>timer.end!==null && remaining(timer,now)>0).map(timer=>remaining(timer,now)));
 }
 function renderDock(force=false) {
   const timers=state.session?.timers.filter(timer=>timer.end!==null || timer.remaining!==timer.duration) ?? [];
@@ -107,10 +133,10 @@ function renderDock(force=false) {
   const open=details?.open || false;
   dock.hidden=!timers.length;
   if (!timers.length) { dock.innerHTML=''; return; }
-  const active=timers.filter(timer=>timer.end!==null && remaining(timer)>0).length;
+  const next=nextCountdown(timers);
   const expired=timers.filter(timer=>timer.end!==null && remaining(timer)===0).length;
   dock.innerHTML='<details '+(open?'open':'')+'><summary>'+icon('time')+' Таймеры <strong>'+timers.length+'</strong>'+
-    (expired?' <span class="overdue">Готово: '+expired+'</span>':active?' <span>Идут: '+active+'</span>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
+    (expired?' <span class="overdue">Готово: '+expired+'</span>':'')+(Number.isFinite(next)?' <strong class="dock-clock" aria-label="Ближайший таймер">'+clock(next)+'</strong>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
   if (focused?.dataset.do && details?.contains(focused)) {
     [...dock.querySelectorAll('[data-do]')].find(el=>el.dataset.do===focused.dataset.do && el.dataset.id===focused.dataset.id)?.focus();
   }
@@ -119,6 +145,9 @@ function tick() {
   if (!state?.session) return;
   const now=Date.now();
   renderDock();
+  const countdown=dock.querySelector('.dock-clock');
+  const next=nextCountdown(state.session.timers,now);
+  if (countdown && Number.isFinite(next)) countdown.textContent=clock(next);
   for (const timer of state.session.timers) {
     const left=remaining(timer,now);
     const expired=timer.end!==null && left===0;
@@ -213,8 +242,8 @@ function fileDialog(kind) {
     return;
   }
   showDialog('Импорт рецептов','<div class="form-stack"><form class="form-stack" id="import-text">'+
-    field('JSON из чата',area('json','','rows="5" maxlength="10485760" required placeholder="Вставьте рецепт или набор рецептов из ChatGPT"'))+
-    '<button class="btn primary">Проверить текст</button></form><hr class="import-divider">'+fileForm+'</div>');
+    field('Вставить из ChatGPT',area('json','','rows="5" maxlength="10485760" required placeholder="Вставьте рецепт или набор рецептов из ChatGPT"'))+
+    '<div class="error-list" data-import-error role="alert" hidden></div><button class="btn primary">Проверить текст</button></form><hr class="import-divider">'+fileForm+'</div>');
 }
 function importPreview(rows) {
   const seen=new Set(catalogItems().map(recipe=>recipe.id));
@@ -226,14 +255,17 @@ function importPreview(rows) {
   }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+button('Отмена','dialog-close')+'</div></form>');
 }
 
-async function checkGitHub() {
+function updateGitHubButton() {
   const control=document.querySelector('[data-do="check-github"]');
-  const label=control?.innerHTML;
-  if (control) {
-    control.disabled=true;
-    control.setAttribute('aria-busy','true');
-    control.textContent='Проверяем GitHub…';
-  }
+  if (!control) return;
+  control.disabled=checkingGitHub;
+  control.textContent=checkingGitHub?'Проверяем GitHub…':'Проверить GitHub';
+  control.setAttribute('aria-busy',String(checkingGitHub));
+}
+async function checkGitHub() {
+  if (!state || checkingGitHub) return;
+  checkingGitHub=true;
+  updateGitHubButton();
   try {
     const {recipes,issues}=await readRecipeInbox(recipeSchema,exchange.bundle);
     let result={added:0,existing:0,overLimit:0};
@@ -246,17 +278,52 @@ async function checkGitHub() {
       result.existing?'Уже в каталоге: '+result.existing+'.':'',
       result.overLimit?'Не добавлено из-за лимита каталога: '+result.overLimit+'.':''
     ].filter(Boolean).join(' ');
-    if (issues.length) {
+    if (issues.length && route()[0]==='recipes' && !dialog.open) {
       const list=issues.slice(0,12).map(({name,message})=>'<li>'+h(name)+' — '+h(message)+'</li>').join('');
       showDialog('Проверка GitHub','<p>'+h(details)+'</p><p>Файлов с ошибками: '+issues.length+'.</p><ul class="error-list">'+list+'</ul>');
-    } else say(details);
+    } else say(details+(issues.length?' Файлов с ошибками: '+issues.length+'.':''));
+  } catch(error) {
+    say(error.message || 'Не удалось проверить GitHub.');
   } finally {
-    if (control?.isConnected) {
-      control.disabled=false;
-      control.removeAttribute('aria-busy');
-      control.innerHTML=label;
-    }
+    checkingGitHub=false;
+    updateGitHubButton();
   }
+}
+
+function validPortions(id) {
+  const field=main.querySelector('.detail-body input[name="servings"]');
+  if (!field || field.dataset.id!==id) return true;
+  if (field.checkValidity()) return true;
+  field.closest('.portion-control').querySelector('.portion-error').hidden=false;
+  field.reportValidity();
+  return false;
+}
+
+function updateAutomaticStatus(current,recipeId) {
+  const status=current.statuses.find(item=>item.id===recipeId);
+  if (status && (status.automatic===false || !status.automatic && status.status!=='new')) return;
+  const entries=current.history.filter(item=>item.recipeId===recipeId);
+  if (!entries.length && !status?.automatic) return;
+  current.statuses=current.statuses.filter(item=>item.id!==recipeId);
+  if (entries.length) {
+    const repeat=entries.some(entry=>!entry.pending && entry.again==='yes');
+    current.statuses.push({id:recipeId,status:repeat?'repeat':'tried',automatic:true});
+  }
+}
+
+async function finishCooking(pending=true,report={}) {
+  const {id,recipe}=state.session;
+  const entry={id,recipeId:recipe.id,name:recipe.name,at:Date.now(),minutes:Math.round(duration(state.session)/60000),
+    rating:0,image:'',good:'',errors:'',next:'',again:'',...report,...(pending?{pending:true}:{})};
+  await changeSession((session,current)=>{
+    if (current.history.some(item=>item.id===entry.id)) throw Error('Эта готовка уже записана.');
+    if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
+    current.history.push(entry);
+    updateAutomaticStatus(current,entry.recipeId);
+    if (current.planned===entry.recipeId) current.planned=null;
+    current.session=null;
+  });
+  return entry;
 }
 
 async function startCooking(id,replace=false) {
@@ -278,8 +345,14 @@ async function startCooking(id,replace=false) {
 
 async function onAction(action,id) {
   const recipe=action==='random'?null:findRecipe(id);
-  if (action.startsWith('editor-')) {
-    await updateDraft(document.querySelector('#editor-form'),draft,action.slice(7),id);
+  if (action.startsWith('editor-') && !action.startsWith('editor-reset')) {
+    const editingKey=draftKey;
+    const editingDraft=draft;
+    const photoKey='editor-photo/'+editingKey;
+    await updateDraft(document.querySelector('#editor-form'),editingDraft,action.slice(7),id,drafts[photoKey]);
+    persistDraft('editor/'+editingKey,editingDraft);
+    if (drafts[photoKey]) persistDraft(photoKey,null);
+    if (route()[0]!=='editor' || draft!==editingDraft) return;
     const scroll=window.scrollY;
     render();
     window.scrollTo(0,scroll);
@@ -296,7 +369,26 @@ async function onAction(action,id) {
   }
   switch(action) {
     case 'dialog-close': dialog.close(); return;
-    case 'start': await startCooking(id); return;
+    case 'editor-reset':
+      confirmAction('Сбросить черновик?','Несохранённые правки будут удалены.','Сбросить','editor-reset-confirm');
+      return;
+    case 'editor-reset-confirm':
+      if (route()[0]!=='editor' || draftKey===null) return;
+      persistDraft('editor/'+draftKey,null);
+      if (drafts['editor-photo/'+draftKey]) persistDraft('editor-photo/'+draftKey,null);
+      draftKey=null;
+      dialog.close();
+      render({focus:true});
+      return;
+    case 'portion-up':
+    case 'portion-down': {
+      const field=main.querySelector('.detail-body input[name="servings"]');
+      const delta=action==='portion-up'?1:-1;
+      field.value=Math.max(1,Math.min(100,(field.validity.valid?+field.value:getPortions(recipe))+delta));
+      field.dispatchEvent(new Event('input',{bubbles:true}));
+      return;
+    }
+    case 'start': if (validPortions(id)) await startCooking(id); return;
     case 'start-replace': await startCooking(id,true); return;
     case 'random': {
       const choices=catalogItems().filter(recipe=>recipe.id!==featuredId);
@@ -313,6 +405,7 @@ async function onAction(action,id) {
       break;
     case 'plan': await change(current=>{current.planned=current.planned===id?null:id;}); say(state.planned?'Добавлено в план':'Убрано из плана'); break;
     case 'recipe-shop':
+      if (!validPortions(id)) return;
       await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
       say('Блюдо добавлено отдельным списком');
       return;
@@ -327,15 +420,17 @@ async function onAction(action,id) {
       fileDialog('import');
       return;
     }
-    case 'check-github': await checkGitHub(); return;
     case 'restore': fileDialog('restore'); return;
     case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
-    case 'restore-confirm':
-      state=await storage.change(()=>restoreData);
-      restoreData=null;
+    case 'restore-confirm': {
+      const snapshot=restoreData;
+      if (!snapshot) return;
       dialog.close();
+      say('Восстанавливаем данные…');
+      state=await storage.change(()=>snapshot);
       say('Данные восстановлены');
       break;
+    }
     case 'shop-add': shopDialog(); return;
     case 'shop-edit': {
       const item=findShoppingList(state,id)?.find(item=>item.id===id);
@@ -343,10 +438,26 @@ async function onAction(action,id) {
       return;
     }
     case 'shop-delete': await change(current=>removeShoppingItem(current,id)); break;
-    case 'shop-batch-delete':
-      await change(current=>{current.shoppingBatches=current.shoppingBatches.filter(batch=>batch.id!==id);});
-      say('Блюдо удалено из покупок');
+    case 'shop-batch-delete': {
+      let removed;
+      await change(current=>{
+        const index=current.shoppingBatches.findIndex(batch=>batch.id===id);
+        if (index>=0) removed={index,batch:current.shoppingBatches.splice(index,1)[0]};
+      });
+      deletedBatch=removed;
+      if (removed) say('Блюдо удалено из покупок',true);
       break;
+    }
+    case 'shop-batch-undo': {
+      if (!deletedBatch) return;
+      const {index,batch}=deletedBatch;
+      await change(current=>{
+        if (!current.shoppingBatches.some(item=>item.id===batch.id)) current.shoppingBatches.splice(index,0,batch);
+      });
+      deletedBatch=null;
+      say('Блюдо возвращено в покупки');
+      break;
+    }
     case 'shop-home':
       await change(current=>{
         const item=findShoppingList(current,id)?.find(item=>item.id===id);
@@ -370,9 +481,17 @@ async function onAction(action,id) {
         else {session.elapsed=duration(session,now); session.activeSince=null;}
       });
       break;
-    case 'cook-finish':
-      await changeSession(session=>{session.elapsed=duration(session); session.activeSince=null; session.reporting=true;});
-      render({focus:true}); return;
+    case 'cook-finish': {
+      const entry=await finishCooking();
+      location.replace('#/impression/'+entry.id);
+      return;
+    }
+    case 'report-defer': {
+      if (state.session?.id!==id || !state.session.reporting) return;
+      const entry=await finishCooking();
+      navigate('history/'+entry.recipeId);
+      return;
+    }
     case 'report-back': await changeSession(session=>{session.reporting=false; session.activeSince=Date.now();}); break;
     case 'cook-cancel': confirmAction('Отменить готовку?','Шаги и таймеры этой попытки будут удалены.','Отменить готовку','cook-discard'); return;
     case 'cook-discard': await changeSession((session,current)=>{current.session=null;}); dialog.close(); navigate('home'); return;
@@ -382,18 +501,29 @@ async function onAction(action,id) {
       confirmAction('Удалить запись?',
         '«'+entry.name+'», '+dateLabel(entry.at)+'. Запись, оценка, заметки и фото будут удалены из истории.',
         'Удалить запись','history-delete-confirm',id);
+      const status=state.statuses.find(item=>item.id===entry.recipeId);
+      if (status && status.automatic===undefined && ['tried','repeat'].includes(status.status) &&
+          state.history.filter(item=>item.recipeId===entry.recipeId).length===1) {
+        dialog.querySelector('.actions').insertAdjacentHTML('beforebegin','<p><label class="toggle"><input type="checkbox" name="reset-status"> Также вернуть статус блюда «Не пробовал»</label></p>');
+      }
       return;
     }
     case 'history-delete-confirm': {
       let removed=false;
+      const reset=dialog.querySelector('[name="reset-status"]')?.checked;
       await change(current=>{
         const index=current.history.findIndex(entry=>entry.id===id);
         if (index!==-1) {
-          current.history.splice(index,1);
+          const [entry]=current.history.splice(index,1);
+          const status=current.statuses.find(item=>item.id===entry.recipeId);
+          if (reset && status?.automatic===undefined && ['tried','repeat'].includes(status?.status) &&
+              !current.history.some(item=>item.recipeId===entry.recipeId)) current.statuses=current.statuses.filter(item=>item.id!==entry.recipeId);
+          else updateAutomaticStatus(current,entry.recipeId);
           removed=true;
         }
       });
       dialog.close();
+      if (removed) persistDraft('report/'+id,null);
       say(removed?'Запись удалена из истории':'Запись уже удалена');
       const [page,recipeId]=route();
       if (page==='history' && recipeId && !state.history.some(entry=>entry.recipeId===recipeId)) navigate('history');
@@ -420,9 +550,17 @@ async function run(work) {
 document.addEventListener('click',event=>{
   const menu=document.querySelector('.recipe-add-menu[open]');
   if (menu && !menu.contains(event.target)) menu.open=false;
+  if (event.target.closest('.skip')) {
+    event.preventDefault();
+    main.focus();
+    main.scrollIntoView();
+    return;
+  }
   if (state) unlockSound();
   const control=event.target.closest('[data-do]');
-  if (control) void run(()=>onAction(control.dataset.do,control.dataset.id));
+  if (!control) return;
+  if (control.dataset.do==='check-github') void checkGitHub();
+  else void run(()=>onAction(control.dataset.do,control.dataset.id));
 });
 document.addEventListener('keydown',event=>{
   if (event.key!=='Escape' || dialog.open) return;
@@ -434,11 +572,27 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('input',event=>{
   const target=event.target;
+  const editorForm=target.closest('#editor-form');
+  if (editorForm && draft) {
+    captureDraft(editorForm,draft);
+    persistDraft('editor/'+draftKey,draft);
+    if (target.type==='file') {
+      const selected=target.files[0];
+      const key='editor-photo/'+draftKey;
+      if (selected?.size<=35*1024*1024) persistDraft(key,selected);
+      else if (drafts[key]) persistDraft(key,null);
+    }
+  }
+  const report=target.closest('#report-form');
+  if (report) saveReportDraft(report);
   if (target.closest('#filters')) {
     filters[target.name]=target.type==='checkbox'?target.checked:target.value;
     catalogResults(state,catalogItems(),filters);
   }
-  if (target.name==='servings' && target.closest('.detail-body') && target.validity.valid && target.value) {
+  if (target.name==='servings' && target.closest('.detail-body')) {
+    const error=target.closest('.portion-control').querySelector('.portion-error');
+    error.hidden=target.validity.valid;
+    if (!target.validity.valid) return;
     const recipe=findRecipe(target.dataset.id);
     if (!recipe) return;
     portions.set(recipe.id,+target.value);
@@ -451,7 +605,7 @@ document.addEventListener('change',event=>{
   const target=event.target;
   void run(async()=>{
     if (target.name==='recipe-status') {
-      await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value}];});
+      await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value,automatic:false}];});
       say('Статус сохранён');
     } else if (target.dataset.item) {
       await change(current=>{const item=findShoppingList(current,target.dataset.item)?.find(item=>item.id===target.dataset.item); if(item) item.state=target.checked?'bought':'todo';});
@@ -469,18 +623,25 @@ document.addEventListener('submit',event=>{
   void run(async()=>{
     switch(form.getAttribute('id')) {
       case 'editor-form': {
-        captureDraft(form,draft);
-        const image=await readPhoto(form.elements.image.files[0]);
-        if (image) draft.image=image;
-        parseRecipes(draft,recipeSchema,exchange.bundle);
-        if (event.submitter?.value==='preview') {showDialog('Предпросмотр рецепта',recipePage(state,draft,draft.servings,true));return;}
-        if (event.submitter?.value==='export') {saveFile(draft.id+'.json',draft);return;}
-        const saved=structuredClone(draft);
+        const key=draftKey;
+        const saved=structuredClone(captureDraft(form,draft));
+        const photoKey='editor-photo/'+key;
+        const image=await readPhoto(form.elements.image.files[0] || drafts[photoKey]);
+        if (image) saved.image=image;
+        persistDraft('editor/'+key,saved);
+        if (drafts[photoKey]) persistDraft(photoKey,null);
+        if (draftKey===key) draft=saved;
+        parseRecipes(saved,recipeSchema,exchange.bundle);
+        if (event.submitter?.value==='preview') {showDialog('Предпросмотр рецепта',recipePage(state,saved,saved.servings,true));return;}
+        if (event.submitter?.value==='export') {saveFile(saved.id+'.json',saved);return;}
         await change(current=>{
           const recipes=[...current.recipes.filter(item=>item.id!==saved.id),saved];
           if (recipes.length>1000) throw Error('В локальном каталоге помещается до 1000 добавленных рецептов.');
           current.recipes=recipes;
         });
+        persistDraft('editor/'+key,null);
+        draft=null;
+        draftKey=null;
         portions.delete(saved.id);
         say('Рецепт сохранён');
         navigate('recipe/'+saved.id);
@@ -488,19 +649,27 @@ document.addEventListener('submit',event=>{
       }
       case 'import-file':
       case 'import-text': {
-        const value=form.getAttribute('id')==='import-text'
-          ? parseJsonText(data.get('json'))
-          : await readJson(form.elements.file.files[0],256);
-        importRows=parseRecipes(value,recipeSchema,exchange.bundle);
+        const inline=form.querySelector('[data-import-error]');
+        try {
+          const value=inline?parseJsonText(data.get('json')):await readJson(form.elements.file.files[0],256);
+          importRows=parseRecipes(value,recipeSchema,exchange.bundle);
+        } catch(error) {
+          if (!inline) throw error;
+          inline.hidden=false;
+          inline.textContent=error.message;
+          return;
+        }
         importPreview(importRows);
         return;
       }
       case 'import-confirm': {
+        const rows=importRows;
+        if (!rows) return;
         let count=0;
         const builtInIds=new Set(builtins.map(recipe=>recipe.id));
         await change(current=>{
           const added=new Map(current.recipes.map(recipe=>[recipe.id,recipe]));
-          importRows.forEach((recipe,index)=>{
+          rows.forEach((recipe,index)=>{
             const choice=data.get('choice-'+index);
             if (choice==='skip') return;
             const id=choice==='copy'?uid():recipe.id;
@@ -541,23 +710,27 @@ document.addEventListener('submit',event=>{
       case 'timer-form': await setTimer(data.get('id'),'adjust',+data.get('seconds')); dialog.close(); return;
       case 'goals-form': await change(current=>{current.goals=Object.fromEntries(Object.keys(goalLabels).map(key=>[key,+data.get(key)]));}); break;
       case 'report-form': {
-        const session=state.session;
-        const image=await readPhoto(form.elements.image.files[0]);
-        const entry={id:session.id,recipeId:session.recipe.id,name:session.recipe.name,at:Date.now(),minutes:+data.get('minutes'),
-          rating:+data.get('rating'),image,good:data.get('good').trim(),errors:data.get('errors').trim(),next:data.get('next').trim(),again:data.get('again')};
-        await changeSession((active,current)=>{
-          if(!active.reporting) throw Error('Сначала завершите готовку.');
-          current.history.push(entry);
-          const status=current.statuses.find(item=>item.id===entry.recipeId);
-          if (!status || status.status==='new') {
-            current.statuses=current.statuses.filter(item=>item.id!==entry.recipeId);
-            current.statuses.push({id:entry.recipeId,status:entry.again==='yes'?'repeat':'tried'});
-          }
-          if (current.planned===entry.recipeId) current.planned=null;
-          current.session=null;
+        const id=form.dataset.entry;
+        const key='report/'+id;
+        const image=await readPhoto(form.elements.image.files[0] || drafts[key]?.image);
+        const report={minutes:+data.get('minutes'),rating:+data.get('rating'),
+          good:data.get('good').trim(),errors:data.get('errors').trim(),next:data.get('next').trim(),again:data.get('again')};
+        let recipeId;
+        if (state.session?.id===id && state.session.reporting) {
+          const entry=await finishCooking(false,{...report,image});
+          recipeId=entry.recipeId;
+        } else await change(current=>{
+          const entry=current.history.find(item=>item.id===id && item.pending);
+          if (!entry) throw Error('Эта запись уже сохранена или удалена.');
+          Object.assign(entry,report);
+          if (image) entry.image=image;
+          delete entry.pending;
+          recipeId=entry.recipeId;
+          updateAutomaticStatus(current,recipeId);
         });
-        say('Запись сохранена в дневнике');
-        navigate('history/'+entry.recipeId);
+        persistDraft(key,null);
+        say('Впечатления сохранены');
+        navigate('history/'+recipeId);
         return;
       }
       default:return;
@@ -612,7 +785,7 @@ try {
   recipeSchema=schema;
   exchange=exchangeSchema.$defs;
   storage=db;
-  [state,builtins]=await Promise.all([storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json')))]);
+  [state,builtins,drafts]=await Promise.all([storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts()]);
   featuredId='pilaf';
   onRoute();
   tick();

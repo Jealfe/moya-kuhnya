@@ -139,3 +139,15 @@ test('резервная копия версии 1 сохраняет стары
   data.shoppingBatches[0].items[0].id=data.shopping[0].id;
   assert.throws(()=>parseBackup(latest,backup,legacyBackup),/повторяются ID продуктов/);
 });
+
+test('резервная копия сохраняет отложенную оценку и автоматический статус',()=>{
+  const data=initialState();
+  data.history.push({id:'pending-one',recipeId:'pilaf',name:'Плов с говядиной',at:10,minutes:30,
+    rating:0,image:'',good:'',errors:'',next:'',again:'',pending:true});
+  data.statuses.push({id:'pilaf',status:'tried',automatic:true});
+  const copy={format:'moya-kuhnya-backup',version:2,created:11,data};
+  const restored=parseBackup(copy,backup,legacyBackup);
+  assert.deepEqual(restored,data);
+  assert.equal(statistics(restored.history).total,1);
+  assert.equal(statistics(restored.history).average,0);
+});

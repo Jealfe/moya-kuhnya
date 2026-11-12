@@ -108,10 +108,18 @@ main:focus {outline:none}
 .no-photo {display:grid;place-items:center;color:var(--olive)}
 .no-photo .icon {width:62px;height:62px}
 .filter-panel {padding:15px;display:grid;gap:12px}
-.catalog-toolbar {flex-wrap:wrap;gap:8px;margin-bottom:0}
-.catalog-toolbar>.actions {margin-left:auto;justify-content:flex-end}
+.catalog-title {display:flex;align-items:center;justify-content:space-between;gap:12px}
+#recipe-count {margin:0}
+.pending-impressions {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.draft-photo {margin:0;overflow-wrap:anywhere}
+.portion-control {display:grid;grid-template-columns:68px auto;gap:4px 5px;align-items:end}
+.portion-control .field {min-width:0}
+.portion-buttons {display:flex;gap:3px}
+.portion-buttons .btn {width:40px;min-height:44px;padding:0;font-size:1.25rem}
+.portion-error {grid-column:1/-1;color:var(--danger);max-width:18ch}
+.detail-body .section-heading {flex-wrap:wrap}
 .recipe-add-menu {position:relative}
-.recipe-add-menu summary {list-style:none;cursor:pointer}
+.recipe-add-menu summary {list-style:none;cursor:pointer;width:44px;min-height:44px;padding:0;color:var(--muted);font-size:1.5rem;line-height:1}
 .recipe-add-menu summary::-webkit-details-marker {display:none}
 .recipe-add-actions {position:absolute;top:calc(100% + 6px);right:0;z-index:3;display:grid;gap:4px;min-width:182px;padding:6px;box-shadow:var(--shadow)}
 .recipe-add-actions .btn {justify-content:flex-start;border-color:transparent;white-space:nowrap}
@@ -154,11 +162,13 @@ summary {cursor:pointer;padding:7px 0;font-weight:650}
 .timer-row {display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--bg)}
 .timer-row>div:first-child {flex:1 1 95px;overflow-wrap:anywhere}
 .timer-row.expired {border-color:var(--brand)}
-.timer-clock {font-size:1.37rem;font-variant-numeric:tabular-nums;font-weight:700}
+.timer-clock {font-size:clamp(2rem,8vw,2.6rem);line-height:1;font-variant-numeric:tabular-nums;font-weight:700;color:var(--olive);background:var(--chip);border-radius:9px;padding:5px 8px}
+.timer-row.expired .timer-clock {color:var(--brand)}
 .timer-row .btn {padding:6px 8px;font-size:.79rem;min-height:40px}
 #timer-dock {position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));right:14px;z-index:5;max-width:min(500px,calc(100vw - 28px));background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 #timer-dock summary {padding:11px 13px;min-height:43px}
 #timer-dock summary span {font-size:.82rem;color:var(--muted)}
+#timer-dock summary .dock-clock {font-size:1.3rem;font-variant-numeric:tabular-nums;color:var(--olive)}
 #timer-dock summary .overdue {color:var(--brand)}
 .dock-list {padding:0 10px 4px;max-height:45vh;overflow:auto}
 .form-stack {display:grid;gap:13px;align-content:start}
@@ -222,6 +232,7 @@ dialog .detail-body {margin-top:15px}
 .error-list {color:var(--danger);padding-left:20px;overflow-wrap:anywhere}
 #notice {position:fixed;bottom:calc(79px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:8;border:1px solid var(--olive);color:var(--ink);background:var(--surface);padding:11px 15px;box-shadow:var(--shadow);border-radius:11px;width:max-content;max-width:calc(100vw - 28px);pointer-events:none}
 #notice:empty {display:none}
+#notice:has(button) {pointer-events:auto;display:flex;gap:10px;align-items:center}
 @media(max-width:850px) {
   .hero {min-height:330px}
   .photo {height:175px}
@@ -256,7 +267,11 @@ dialog .detail-body {margin-top:15px}
   .page-heading {align-items:start;flex-direction:column}
   .four-fields {grid-template-columns:repeat(2,minmax(0,1fr))}
   .shopping-row {flex-wrap:wrap}
-  .cook-actions .btn {flex:1 1 auto}
+  body:has(.cook-actions) main {padding-bottom:calc(190px + env(safe-area-inset-bottom))}
+  body:has(.cook-actions) #timer-dock {bottom:calc(125px + env(safe-area-inset-bottom))}
+  .cook-actions {position:fixed;z-index:4;bottom:calc(60px + env(safe-area-inset-bottom));left:0;right:0;display:grid;grid-template-columns:auto 1fr 1fr;gap:5px;padding:5px 8px;background:var(--surface);border-top:1px solid var(--line)}
+  .cook-actions .btn {font-size:.78rem;line-height:1.15;min-width:0;padding:5px;text-align:center}
+  .cook-actions .icon {display:none}
   .cook-actions .primary {margin-left:0}
 }
 @media(prefers-reduced-motion:no-preference) {

@@ -19,7 +19,7 @@ const mover = (kind,index,length) =>
   button('↓','editor-'+kind+'-down',{id:index,disabled:index===length-1})+
   button('Удалить','editor-'+kind+'-delete',{id:index,kind:'quiet danger',disabled:length===1});
 
-export function editor(recipe, original) {
+export function editor(recipe,original,selectedPhoto) {
   return link(original?'К рецепту':'К рецептам',original?'recipe/'+original:'recipes',{kind:'quiet'})+
     heading(original?'Редактировать рецепт':'Новый рецепт','Сохраните ингредиенты, шаги и таймеры для следующей готовки.')+
     '<form id="editor-form" class="form-stack">'+datalist('categories',categories)+datalist('groups',groups)+
@@ -28,7 +28,9 @@ export function editor(recipe, original) {
     '</div>'+field('Описание',textarea('description',recipe.description,650,true))+
     '<div class="form-grid four-fields">'+field('Порций',number('servings',recipe.servings,1,100))+field('Сложность 1–5',number('difficulty',recipe.difficulty,1,5))+
     field('Подготовка, мин',number('prep',recipe.prep,0,1440))+field('Готовка, мин',number('cook',recipe.cook,1,1440))+'</div>'+
-    (recipe.image?photo(recipe.image,recipe.name,'edit-photo')+button('Убрать фото','editor-photo-delete',{kind:'quiet danger'}):'')+
+    (recipe.image?photo(recipe.image,recipe.name,'edit-photo'):'')+
+    ((recipe.image||selectedPhoto)?button('Убрать фото','editor-photo-delete',{kind:'quiet danger'}):'')+
+    (selectedPhoto?'<p class="muted draft-photo">'+h(selectedPhoto.name)+'</p>':'')+
     field('Фото',input('image','','type="file" accept="image/jpeg,image/png,image/webp"'))+
     field('Посуда и инструменты, по одному на строку',textarea('tools',recipe.tools.join('\n'),4800,true))+'</section>'+
     '<section class="panel padded form-stack"><div class="section-heading"><h2>Ингредиенты</h2>'+button('Добавить','editor-ing-add',{symbol:'plus',disabled:recipe.ingredients.length>=60})+'</div>'+
@@ -50,7 +52,7 @@ export function editor(recipe, original) {
       '<div class="actions">'+button('Добавить таймер','editor-timer-add',{id:i,symbol:'time',disabled:step.timers.length>=8})+mover('step',i,recipe.steps.length)+'</div></fieldset>').join('')+'</section>'+
     '<section class="panel padded form-stack"><h2>Советы</h2>'+field('Советы, по одному на строку',textarea('tips',recipe.tips.join('\n'),10000))+
     field('Типичные ошибки, по одной на строку',textarea('mistakes',recipe.mistakes.join('\n'),10000))+'</section>'+
-    '<div class="actions"><button class="btn primary" name="mode" value="save">Сохранить рецепт</button><button class="btn" name="mode" value="preview">Предпросмотр</button><button class="btn" name="mode" value="export">Экспортировать JSON</button></div></form>';
+    '<div class="actions"><button class="btn primary" name="mode" value="save">Сохранить рецепт</button><button class="btn" name="mode" value="preview">Предпросмотр</button><button class="btn" name="mode" value="export">Экспортировать JSON</button>'+button('Сбросить черновик','editor-reset',{kind:'quiet danger'})+'</div></form>';
 }
 
 export function captureDraft(form,draft) {
@@ -72,10 +74,10 @@ export function captureDraft(form,draft) {
   }));
   return draft;
 }
-export async function updateDraft(form,draft,action,id) {
+export async function updateDraft(form,draft,action,id,selectedPhoto) {
   captureDraft(form,draft);
   if (action==='photo-delete') { draft.image=''; return; }
-  const image=await readPhoto(form.elements.image.files[0]);
+  const image=await readPhoto(form.elements.image.files[0] || selectedPhoto);
   if (image) draft.image=image;
   const [type,verb]=action.split('-');
   const [index,second]=id.split('-').map(Number);

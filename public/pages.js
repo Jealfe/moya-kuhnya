@@ -14,28 +14,28 @@ export function home(state, recipes, featured) {
   const mastered=recipes.filter(recipe=>statusFor(state,recipe.id)==='mastered').length;
   const resume=state.session ? '<section class="panel resume"><div><div class="kicker">Готовка в процессе</div><h2>'+h(state.session.recipe.name)+'</h2><p class="muted">'+(state.session.reporting?'Отчёт о приготовлении':'Шаг '+(state.session.step+1)+' из '+state.session.recipe.steps.length)+'</p></div>'+link('Продолжить готовку','cook',{kind:'primary',symbol:'arrow'})+'</section>' : '';
   return '<div class="today">'+h(dateToday())+'</div>'+resume+
-    '<section class="hero"><div class="hero-copy"><div class="kicker">'+icon('spark')+' Блюдо дня</div><h1>Что приготовим<br>сегодня?</h1><p>'+h(featured.description)+'</p><div class="actions">'+start(featured)+button('Другое блюдо','random',{kind:'ghost',symbol:'spark'})+'</div></div>'+
+    '<section class="hero"><div class="hero-copy"><div class="kicker">'+icon('spark')+' Блюдо дня</div><h1>Что приготовим<br>сегодня?</h1><p>'+h(featured.description)+'</p><div class="actions">'+link('Открыть рецепт','recipe/'+featured.id,{kind:'primary',symbol:'arrow'})+button('Другое блюдо','random',{kind:'ghost',symbol:'spark'})+'</div></div>'+
     '<a class="hero-art" href="#/recipe/'+h(featured.id)+'">'+(featured.image==='dish:0'?'<div class="photo"><img class="local-photo" src="./images/pilaf.jpg" alt=""></div>':photo(featured.image,featured.name))+'<span class="hero-caption"><strong>'+h(featured.name)+'</strong><small>'+icon('time')+' '+totalTime(featured)+' мин</small></span></a></section>'+
     '<section><div class="section-heading"><h2>Ваш прогресс</h2><a href="#/history">В дневник '+icon('arrow')+'</a></div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
-    '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(ratingLabel(latest.rating))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
+    '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
     '<div class="panel mini"><div class="kicker">Готовим следующим</div>'+(planned?'<h3>'+h(planned.name)+'</h3>'+link('Открыть рецепт','recipe/'+h(planned.id),{kind:'quiet'}):'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
     '<section><div class="section-heading"><h2>Из каталога</h2><a href="#/recipes">Все рецепты '+icon('arrow')+'</a></div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
 }
 
-export function catalog(state,recipes,filters) {
+export function catalog(recipes,filters,checkingGitHub) {
   const categories=[...new Set(recipes.map(recipe=>recipe.category))];
-  return heading('Рецепты','Выберите блюдо или добавьте свой рецепт.')+
+  return '<div class="catalog-title"><h1>Рецепты</h1><details class="recipe-add-menu">'+
+    '<summary class="btn quiet" aria-label="Действия с рецептами" title="Действия с рецептами"><span aria-hidden="true">⋯</span></summary><div class="panel recipe-add-actions">'+
+    link('Новый рецепт','editor',{symbol:'plus'})+button('Импорт','import',{symbol:'upload'})+
+    button(checkingGitHub?'Проверяем GitHub…':'Проверить GitHub','check-github',{disabled:checkingGitHub})+
+    button('Экспорт всех','export-all',{symbol:'download'})+'</div></details></div>'+
     '<form id="filters" class="panel filter-panel"><div class="search">'+icon('search')+input('query',filters.query,'type="search" aria-label="Поиск рецептов" placeholder="Поиск по блюдам и продуктам"')+'</div><div class="filter-selects">'+
     field('Категория',select('category',[['','Все'],...categories.map(category=>[category,category])],filters.category))+
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
     '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label></div></form>'+
-    '<div class="section-heading catalog-toolbar"><p id="recipe-count" aria-live="polite"></p><div class="actions">'+
-    button('Экспорт всех','export-all',{symbol:'download',kind:'quiet'})+
-    '<details class="recipe-add-menu"><summary class="btn">'+icon('plus')+'Добавить рецепты</summary><div class="panel recipe-add-actions">'+
-    button('Проверить GitHub','check-github',{symbol:'history'})+button('Импорт','import',{symbol:'upload'})+
-    link('Новый рецепт','editor',{symbol:'plus'})+'</div></details></div></div><div id="recipe-results" class="cards"></div>';
+    '<p id="recipe-count" class="muted" aria-live="polite"></p><div id="recipe-results" class="cards"></div>';
 }
 export function catalogResults(state,recipes,filters) {
   const clean = value => value.toLocaleLowerCase('ru').replace(/ё/g,'е');
@@ -53,13 +53,18 @@ export function recipePage(state,recipe,servings,preview=false) {
   const planned=state.planned===recipe.id;
   const history=ordered(state.history.filter(entry=>entry.recipeId===recipe.id));
   const actions=preview?'':'<div class="actions">'+start(recipe)+button('В список покупок','recipe-shop',{id:recipe.id,symbol:'shopping'})+'</div>';
+  const portionControl='<div class="portion-control">'+
+    field('Порций',input('servings',servings,'type="number" min="1" max="100" required inputmode="numeric" aria-describedby="portion-error" data-id="'+h(recipe.id)+'"'))+
+    '<div class="portion-buttons"><button type="button" class="btn" data-do="portion-down" data-id="'+h(recipe.id)+'" aria-label="Уменьшить число порций">−</button>'+
+    '<button type="button" class="btn" data-do="portion-up" data-id="'+h(recipe.id)+'" aria-label="Увеличить число порций">+</button></div>'+
+    '<small class="portion-error" id="portion-error" hidden>Введите целое число от 1 до 100.</small></div>';
   return (preview?'':link('Все рецепты','recipes',{kind:'quiet',symbol:'back'}))+
     '<section class="detail-top">'+photo(recipe.image,recipe.name)+'<div class="detail-copy"><div class="kicker">'+h(recipe.category)+'</div><h1>'+h(recipe.name)+'</h1><p class="lead">'+h(recipe.description)+'</p>'+
     '<div class="pills"><span>'+icon('time')+' Подготовка '+recipe.prep+' мин</span><span>'+icon('time')+' Готовка '+recipe.cook+' мин</span><span>Сложность '+recipe.difficulty+'/5</span></div>'+actions+
     (preview?'':'<div class="actions">'+button(favorite?'В избранном':'В избранное','favorite',{id:recipe.id,kind:favorite?'active':'',symbol:'heart'})+button(planned?'Убрать из плана':'Запланировать','plan',{id:recipe.id})+link('Редактировать','editor/'+recipe.id)+button('Экспорт','export-recipe',{id:recipe.id,symbol:'download'})+'</div>'+
     field('Статус блюда',select('recipe-status',Object.entries(statusLabels),statusFor(state,recipe.id),'data-id="'+h(recipe.id)+'"')))+
     '</div></section><div class="detail-body"><section class="panel padded"><div class="section-heading"><h2>Ингредиенты</h2>'+
-    (preview?'<span>'+servings+' порций</span>':field('Порций',input('servings',servings,'type="number" min="1" max="100" inputmode="numeric" data-id="'+h(recipe.id)+'"')))+
+    (preview?'<span>'+servings+' порций</span>':portionControl)+
     '</div>'+foodList(scaled(recipe.ingredients,servings,recipe.servings))+'<h3>Что понадобится</h3>'+list(recipe.tools)+'</section>'+
     '<section class="panel padded"><h2>План приготовления</h2><ol class="steps">'+recipe.steps.map(step=>'<li><details><summary>'+h(step.title)+'</summary><p>'+h(step.instruction)+'</p>'+(step.temperature?'<p class="muted">'+h(step.temperature)+'</p>':'')+'</details></li>').join('')+'</ol>'+
     (recipe.tips.length?'<h3>Советы</h3>'+list(recipe.tips):'')+(recipe.mistakes.length?'<h3>Частые ошибки</h3>'+list(recipe.mistakes):'')+
@@ -77,10 +82,10 @@ export function timerCard(timer, template) {
     button('Время','timer-edit',{id:timer.id})+button('Сброс','timer-reset',{id:timer.id,disabled:untouched})+'</div></div>';
 }
 
-export function cookPage(state) {
+export function cookPage(state,reportDraft) {
   const session=state.session;
   if (!session) return empty('Готовка ещё не начата','Откройте рецепт, чтобы начать.',link('К рецептам','recipes',{kind:'primary'}));
-  if (session.reporting) return reportPage(session);
+  if (session.reporting) return reportPage({id:session.id,name:session.recipe.name,minutes:Math.round(duration(session)/60000)},reportDraft,true);
   const {recipe,step:index,done,servings}=session;
   const step=recipe.steps[index];
   const previous=ordered(state.history.filter(entry=>entry.recipeId===recipe.id))[0];
@@ -102,21 +107,25 @@ export function cookPage(state) {
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+
     (notes(previous)?'<h3>Из прошлой попытки</h3>'+notes(previous):'')+'</aside></div>'+
     '<div class="actions cook-actions">'+button('Назад','cook-step',{id:index-1,disabled:index===0,symbol:'back'})+
-    button(done.includes(index)?'Снять отметку':'Отметить шаг','cook-check',{symbol:'check'})+
+    button(done.includes(index)?'Снять отметку':'Отметить шаг','cook-check')+
     (index===recipe.steps.length-1?button('Завершить готовку','cook-finish',{kind:'primary',symbol:'check'}):button('Далее','cook-step',{id:index+1,kind:'primary',symbol:'arrow'}))+'</div>'+
     '<p class="muted timer-help">После закрытия приложения сигнал может не прозвучать. Для надёжного сигнала поставьте таймер в приложении «Часы».</p>'+button('Отменить готовку','cook-cancel',{kind:'quiet danger'});
 }
 
-function reportPage(session) {
-  return heading('Как получилось?',session.recipe.name)+
-    '<form class="panel padded form-stack" id="report-form"><div class="form-grid">'+
-    field('Затрачено, минут',input('minutes',Math.round(duration(session)/60000),'type="number" min="0" max="1000000" required'))+
-    field('Приготовили бы ещё раз?',select('again',[['','Без ответа'],['yes','Да'],['no','Нет']],''))+'</div>'+
-    '<fieldset class="rating"><legend>Оценка результата</legend>'+[1,2,3,4,5].map(n=>'<label title="'+n+' из 5"><input type="radio" name="rating" value="'+n+'" aria-label="'+n+' из 5">'+icon('star')+'</label>').join('')+'</fieldset>'+
+const impressionLabel = entry => entry.pending?'Оценка отложена':ratingLabel(entry.rating);
+export function reportPage(entry,draft,legacy=false) {
+  const values={...entry,...draft};
+  const later=legacy?button('Оценить позже','report-defer',{id:entry.id}):link('Оценить позже','history/'+entry.recipeId,{kind:'quiet'});
+  return heading('Как получилось?',entry.name,later)+
+    '<form class="panel padded form-stack" id="report-form" data-entry="'+h(entry.id)+'"><div class="form-grid">'+
+    field('Затрачено, минут',input('minutes',values.minutes,'type="number" min="0" max="1000000" required'))+
+    field('Приготовили бы ещё раз?',select('again',[['','Без ответа'],['yes','Да'],['no','Нет']],values.again??''))+'</div>'+
+    '<fieldset class="rating"><legend>Оценка результата</legend>'+[1,2,3,4,5].map(n=>'<label title="'+n+' из 5"><input type="radio" name="rating" value="'+n+'" aria-label="'+n+' из 5" '+(+values.rating===n?'checked':'')+'>'+icon('star')+'</label>').join('')+'</fieldset>'+
     field('Фото блюда',input('image','','type="file" accept="image/jpeg,image/png,image/webp"'))+
-    field('Что получилось хорошо',area('good','','maxlength="2400"'))+field('Что пошло не так',area('errors','','maxlength="2400"'))+
-    field('Что изменить в следующий раз',area('next','','maxlength="2400"'))+
-    '<div class="actions"><button class="btn primary">Сохранить в дневник</button>'+button('Вернуться к шагам','report-back')+'</div></form>';
+    '<p class="muted draft-photo" '+(values.image?'':'hidden')+'>'+h(values.image?.name??'Фото сохранено')+'</p>'+
+    field('Что получилось хорошо',area('good',values.good??'','maxlength="2400"'))+field('Что пошло не так',area('errors',values.errors??'','maxlength="2400"'))+
+    field('Что изменить в следующий раз',area('next',values.next??'','maxlength="2400"'))+
+    '<div class="actions"><button class="btn primary">Сохранить впечатления</button>'+(legacy?button('Вернуться к шагам','report-back'):'')+'</div></form>';
 }
 
 function shoppingGroups(items) {
@@ -146,20 +155,22 @@ export const goalLabels = {monthly:'Приготовлений за месяц',
 export function historyPage(state,recipeId,period) {
   const history=ordered(state.history);
   const entries=recipeId?history.filter(item=>item.recipeId===recipeId):history;
+  const pending=entries.filter(entry=>entry.pending);
   const stats=statistics(history);
   const points=activity(history,period);
   const chartMax=Math.max(1,...points.map(point=>point.count));
   return (recipeId?link('Весь дневник','history',{kind:'quiet',symbol:'back'}):'')+
     heading(recipeId?(entries[0]?.name??'Попытки'):'Кулинарный дневник',recipeId?'Сравните оценки, фотографии и заметки.':'Следите за практикой и сохраняйте наблюдения.',
       recipeId?'':button('Настроить цели','goals',{symbol:'trend'}))+
+    (pending.length?'<div class="info pending-impressions">'+(pending.length===1?'Ждёт оценки: '+h(pending[0].name):'Блюд ждут оценки: '+pending.length)+link('Оценить','impression/'+pending[0].id,{kind:'quiet'})+'</div>':'')+
     (recipeId?'':'<div class="stats four">'+stat('Всего',stats.total,'bowl')+stat('Уникальных блюд',stats.unique,'recipes')+stat('Повторных попыток',stats.repeats,'history')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div>'+
       '<div class="duo"><section class="panel padded"><div class="section-heading activity-heading"><h2>Активность</h2>'+select('period',[['week','По неделям'],['month','По месяцам']],period,'aria-label="Период активности"')+'</div><div class="chart">'+points.map(point=>'<div><strong>'+point.count+'</strong><span class="bar" style="--bar:'+Math.max(3,point.count/chartMax*100)+'%"></span><small>'+h(point.label)+'</small></div>').join('')+'</div></section>'+
       '<section class="panel padded"><h2>Цели на месяц</h2>'+Object.entries(goalLabels).map(([key,label])=>state.goals[key]?'<label class="goal"><span>'+label+'</span><strong>'+stats[key]+' / '+state.goals[key]+'</strong><progress value="'+Math.min(stats[key],state.goals[key])+'" max="'+state.goals[key]+'"></progress></label>':'').join('')+(Object.values(state.goals).some(Boolean)?'':'<p class="muted">Установите свою первую цель.</p>')+'</section></div>'+
       (history.length?'<div class="duo"><section class="panel padded"><h2>Готовите чаще всего</h2>'+list(stats.popular.slice(0,5).map(item=>item.name+' · '+item.count))+'</section><section class="panel padded"><h2>Изменение оценок</h2>'+(stats.change.length?list(stats.change.map(item=>item.name+' · '+item.from+' → '+item.to)):'<p class="muted">Появится после двух оценённых попыток одного блюда.</p>')+'</section></div>':''))+
     '<section><div class="section-heading"><h2>Попытки</h2></div>'+(entries.length?'<div class="entry-grid">'+entries.map(entry=>'<article class="panel entry">'+
     (entry.image?photo(entry.image,'Фото готового блюда «'+entry.name+'»'):'')+'<div class="padded"><span class="kicker">'+h(dateLabel(entry.at))+'</span><h3>'+h(entry.name)+'</h3>'+
-    '<div class="pills"><span>'+icon('star')+' '+ratingLabel(entry.rating)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
-    notes(entry)+'<div class="actions">'+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
+    '<div class="pills"><span>'+icon('star')+' '+impressionLabel(entry)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
+    notes(entry)+'<div class="actions">'+(entry.pending?link('Оценить','impression/'+entry.id,{kind:'primary'}):'')+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
     button('Удалить запись','history-delete',{id:entry.id,kind:'quiet danger'})+'</div></div></article>').join('')+'</div>':
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }
