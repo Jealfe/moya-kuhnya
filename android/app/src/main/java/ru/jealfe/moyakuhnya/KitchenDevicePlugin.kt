@@ -27,7 +27,7 @@ class KitchenDevicePlugin : Plugin() {
         val light = call.getBoolean("light", false) == true
         activity.runOnUiThread {
             val window = activity.window
-            window.decorView.setBackgroundColor(Color.parseColor(if (light) "#f6f2e8" else "#181a15"))
+            window.decorView.setBackgroundColor(Color.parseColor(if (light) "#f4f4eb" else "#161e18"))
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.isAppearanceLightStatusBars = light
             controller.isAppearanceLightNavigationBars = light

@@ -16,6 +16,6 @@ public class MainActivity extends BridgeActivity {
             getWindow().setStatusBarContrastEnforced(false);
             getWindow().setNavigationBarContrastEnforced(false);
         }
-        getWindow().getDecorView().setBackgroundColor(Color.rgb(24, 26, 21));
+        getWindow().getDecorView().setBackgroundColor(Color.rgb(22, 30, 24));
     }
 }

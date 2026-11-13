@@ -88,7 +88,7 @@ function render({focus=false}={}) {
   const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
   if (document.documentElement.dataset.theme!==state.settings.theme) syncSystemBars();
   document.documentElement.dataset.theme=state.settings.theme;
-  document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#181a15':'#f6f2e8';
+  document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#161e18':'#f4f4eb';
   const recipes=catalogItems();
   const recipe=id?findRecipe(id):null;
   header.innerHTML='<div class="header-inner"><a class="brand" href="#/home">'+icon('logo')+'<span>Моя кухня</span></a><div class="header-right">'+
