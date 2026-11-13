@@ -119,7 +119,7 @@ export function cookPage(state,reportDraft,ai=null) {
     '<div class="actions cook-actions">'+button('Назад','cook-step',{id:index-1,disabled:index===0,symbol:'back'})+
     button(done.includes(index)?'Снять отметку':'Отметить шаг','cook-check')+
     (index===recipe.steps.length-1?button('Завершить готовку','cook-finish',{kind:'primary',symbol:'check'}):button('Далее','cook-step',{id:index+1,kind:'primary',symbol:'arrow'}))+'</div>'+
-    '<p class="muted timer-help">После закрытия приложения сигнал может не прозвучать. Для надёжного сигнала поставьте таймер в приложении «Часы».</p>'+button('Отменить готовку','cook-cancel',{kind:'quiet danger'});
+    '<p class="muted timer-help">'+(isAndroid()?'Для сигнала на заблокированном экране включите уведомления и точные сигналы в настройках приложения.':'После закрытия страницы сигнал может не прозвучать.')+'</p>'+button('Отменить готовку','cook-cancel',{kind:'quiet danger'});
 }
 
 const impressionLabel = entry => entry.pending?'Оценка отложена':ratingLabel(entry.rating);
@@ -195,7 +195,7 @@ export function settingsPage(state, offline, install,ai=null) {
     '<section class="panel padded form-stack"><h2>Установка и офлайн</h2><p>'+h(offline)+'</p>'+
     (isAndroid()?'':
       install?button('Установить приложение','install',{kind:'primary'}):'<p class="muted">В Chrome на Android откройте меню ⋮ и выберите установку или добавление на главный экран.</p>')+
-    '<p class="muted">После закрытия приложения надёжный сигнал даёт системный таймер телефона.</p></section></div>'+
+    '<p class="muted">'+(isAndroid()?'Разрешения для фоновых сигналов находятся в разделе «Уведомления таймеров».':'После закрытия страницы используйте системный таймер телефона.')+'</p></section></div>'+
     '<section class="panel padded form-stack"><h2>Резервная копия</h2><p>Сохраните рецепты, фото, покупки и дневник в файл. Копию можно восстановить после переустановки или открыть на другом устройстве.</p>'+
     '<div class="actions">'+button('Скачать копию','backup',{symbol:'download',kind:'primary'})+(isAndroid()?button('Поделиться копией','backup-share'):'')+button('Восстановить из файла','restore',{symbol:'upload'})+'</div></section>';
 }

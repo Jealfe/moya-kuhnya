@@ -29,6 +29,38 @@ let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
+let timerNotificationStatus=null;
+
+function timerPlugin() {
+  return isAndroid()?globalThis.Capacitor?.Plugins?.KitchenTimers:null;
+}
+
+async function syncTimerNotifications() {
+  const plugin=timerPlugin();
+  if (!plugin || !state) return;
+  const session=state.session;
+  const timers=(session?.reporting?[]:session?.timers??[]).filter(timer=>timer.end!==null).map(timer=>({
+    key:session.id+':'+timer.id,end:timer.end,name:timer.name,recipe:session.recipe.name,sound:state.settings.sound
+  }));
+  try {
+    timerNotificationStatus=await plugin.sync({timers});
+  } catch {
+    timerNotificationStatus=null;
+  }
+}
+
+function timerNotificationPanel() {
+  if (!timerPlugin()) return '';
+  const status=timerNotificationStatus;
+  const allowed=state.settings.sound?status?.soundAvailable:status?.silentAvailable;
+  return '<section class="panel padded form-stack"><h2>Уведомления таймеров</h2><p>'+
+    (!status?'Не удалось проверить разрешения Android.':!allowed?'Разрешите уведомления таймеров в Android.':
+      status.exact?'Уведомления таймеров включены.':'Уведомления включены. Для точного сигнала разрешите будильники и напоминания.')+
+    '</p><div class="actions">'+
+    (!status?.enabled?button('Разрешить уведомления','timer-notification-permission'):'')+
+    button('Настройки уведомлений Android','timer-notification-settings')+
+    (!status?.exact?button('Разрешить точные сигналы','timer-notification-exact'):'')+'</div></section>';
+}
 const autoBackup=createAutoBackup({getBackup:async()=>makeBackup(await storage.readBackup()),notice:message=>say(message)});
 const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate,{backup:true}),render:()=>render(),showDialog,showError:error=>showError(error)});
 
@@ -69,6 +101,7 @@ const showError = error => showDialog('Проверьте данные','<ul cla
   (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
 async function change(mutate,{backup=false}={}) {
   state=await storage.change(current=>{mutate(current); return current;});
+  await syncTimerNotifications();
   if (backup) void autoBackup.save(); else autoBackup.schedule();
   await ai.refreshAdvice();
 }
@@ -123,7 +156,7 @@ function render({focus=false}={}) {
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
     case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
-    case 'settings': main.innerHTML=settingsPage(state,isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',Boolean(installEvent),ai)+autoBackup.panel(); break;
+    case 'settings': main.innerHTML=settingsPage(state,isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',Boolean(installEvent),ai)+timerNotificationPanel()+autoBackup.panel(); break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);
@@ -190,7 +223,7 @@ function tick() {
     if (announced.has(key)) continue;
     announced.add(key);
     say('Таймер завершён · '+timer.name);
-    beep();
+    if (!timerNotificationStatus?.exact || !timerNotificationStatus.soundAvailable) beep();
   }
 }
 function unlockSound() {
@@ -382,6 +415,16 @@ async function onAction(action,id) {
     window.scrollTo(0,scroll);
     return;
   }
+  if (action.startsWith('timer-notification-')) {
+    const plugin=timerPlugin();
+    if (!plugin) return;
+    if (action==='timer-notification-permission') {
+      await plugin.requestNotifications();
+      await syncTimerNotifications();
+      render();
+    } else await plugin.openSettings({exact:action==='timer-notification-exact'});
+    return;
+  }
   if (action.startsWith('timer-')) {
     if (action==='timer-edit') {
       const timer=timerById(id);
@@ -462,6 +505,7 @@ async function onAction(action,id) {
       dialog.close();
       say('Восстанавливаем данные…');
       state=await storage.restoreBackup(snapshot);
+      await syncTimerNotifications();
       if (snapshot.drafts) {
         drafts=Object.fromEntries(snapshot.drafts.map(({id,value})=>[id,value]));
         draft=null;
@@ -836,7 +880,10 @@ addEventListener('offline',softRender);
 document.addEventListener('visibilitychange',()=>{
   refreshWake();
   tick();
-  if (state && !document.hidden) syncSystemBars();
+  if (state && !document.hidden) {
+    syncSystemBars();
+    void syncTimerNotifications().then(()=>{if (route()[0]==='settings') softRender();});
+  }
 });
 dialog.addEventListener('close',()=>{restoreData=null;importRows=null;});
 installSelectMenus();
@@ -854,6 +901,7 @@ try {
   pantry=createPantry(pantryDialog,storage,savedPantry,()=>autoBackup.schedule());
   featuredId='pilaf';
   await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
+  await syncTimerNotifications();
   syncSystemBars();
   onRoute();
   tick();

@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KitchenFilesPlugin.class);
         registerPlugin(KitchenDevicePlugin.class);
         registerPlugin(GigaChatPlugin.class);
+        registerPlugin(KitchenTimersPlugin.class);
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this, SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT));
         if (Build.VERSION.SDK_INT >= 29) {
