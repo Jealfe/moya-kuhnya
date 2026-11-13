@@ -121,7 +121,7 @@ function render({focus=false}={}) {
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
     case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
-    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent),ai)+autoBackup.panel(); break;
+    case 'settings': main.innerHTML=settingsPage(state,isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',Boolean(installEvent),ai)+autoBackup.panel(); break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);
@@ -431,10 +431,9 @@ async function onAction(action,id) {
       await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
       say('Блюдо добавлено отдельным списком');
       return;
-    case 'export-recipe': await saveFile(id+'.json',recipe); return;
     case 'export-all': await saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
     case 'import': {
-      const menu=document.querySelector('.recipe-add-menu[open]');
+      const menu=document.querySelector('.recipe-add-menu[open],.detail-menu[open]');
       if (menu) {
         menu.open=false;
         menu.querySelector('summary').focus();
@@ -448,7 +447,13 @@ async function onAction(action,id) {
       await autoBackup.action(action);
       break;
     case 'restore': fileDialog('restore'); return;
-    case 'backup': await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
+    case 'backup-share':
+    case 'backup': {
+      const saved=await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',
+        {format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()},{maxMb:256,share:action==='backup-share'});
+      if (isAndroid() && saved) say('Резервная копия сохранена');
+      return;
+    }
     case 'restore-confirm': {
       const snapshot=restoreData;
       if (!snapshot) return;
@@ -595,7 +600,7 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('keydown',event=>{
   if (event.key!=='Escape' || dialog.open || pantryDialog.open) return;
-  const menu=document.querySelector('.recipe-add-menu[open]');
+  const menu=document.querySelector('.recipe-add-menu[open],.detail-menu[open]');
   if (menu) {
     menu.open=false;
     menu.querySelector('summary').focus();
@@ -634,6 +639,15 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   const target=event.target;
+  if (target.name==='ai-model') {
+    const custom=target.form.elements['ai-custom-model'];
+    const visible=!target.value;
+    custom.closest('[data-custom-model]').hidden=!visible;
+    custom.disabled=!visible;
+    custom.required=visible;
+    if (visible) custom.focus();
+    return;
+  }
   void run(async()=>{
     if (target.name==='recipe-status') {
       await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value,automatic:false}];});

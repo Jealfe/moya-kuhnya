@@ -32,13 +32,15 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
   function settings() {
     if (!isAndroid()) return '<section class="panel padded"><h2>Искусственный интеллект</h2><p>GigaChat доступен в Android-приложении. Сохранённые анализы можно читать и переносить в JSON-копии.</p></section>';
     const disabled=settingsBusy||busyEntry?'disabled':'';
+    const modelOptions=[...new Set([status.model,...models])].map(model=>[model,model]);
     return '<section class="panel padded form-stack"><h2>Искусственный интеллект</h2><p>GigaChat анализирует рецепт и ваши текстовые отзывы только по нажатию кнопки. Фотографии не отправляются.</p>'+
       '<form id="ai-settings" class="form-stack">'+field('Ключ авторизации GigaChat',input('gigachat-key','','type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8192" '+disabled))+
       '<small>'+h(status.hasKey?'Ключ сохранён на устройстве. Оставьте поле пустым, чтобы сохранить только модель и тип доступа.':'Введите ключ авторизации из личного кабинета GigaChat.')+'</small>'+
-      field('Модель',input('ai-model',status.model,'list="ai-models" required maxlength="100" '+disabled))+
-      '<datalist id="ai-models">'+models.map(model=>'<option value="'+h(model)+'">').join('')+'</datalist>'+
+      field('Модель',select('ai-model',[...modelOptions,['','Указать вручную']],status.model,disabled))+
+      '<div data-custom-model hidden>'+field('Название модели',input('ai-custom-model','','maxlength="100" autocomplete="off" autocapitalize="off" spellcheck="false" disabled'))+'</div>'+
+      '<small>Чтобы загрузить список моделей, нажмите «Проверить подключение».</small>'+
       field('Тип доступа',select('ai-scope',[['GIGACHAT_API_PERS','Личный'],['GIGACHAT_API_B2B','Бизнес (B2B)'],['GIGACHAT_API_CORP','Корпоративный']],status.scope,disabled))+
-      '<button class="btn primary" '+disabled+'>Сохранить ключ</button></form>'+
+      '<button class="btn primary" '+disabled+'>Сохранить настройки</button></form>'+
       '<div class="actions">'+button('Проверить подключение','ai-connect',{disabled:Boolean(disabled)||!status.hasKey})+
       button('Удалить ключ','ai-delete-key',{disabled:Boolean(disabled)||!status.hasKey,kind:'quiet danger'})+'</div>'+
       '<p role="status">'+h(settingsBusy?'Выполняется…':connectionStatus)+'</p><small>Ключ защищён Android Keystore и не включается в JSON-копии. После удаления приложения введите его заново. На устройстве с root-доступом абсолютная защита секретов невозможна.</small></section>';
@@ -121,7 +123,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     if (settingsBusy||busyEntry) return;
     const field=form.elements['gigachat-key'];
     let key=field.value.trim();field.value='';
-    const options={model:form.elements['ai-model'].value.trim(),scope:form.elements['ai-scope'].value};
+    const options={model:(form.elements['ai-model'].value || form.elements['ai-custom-model'].value).trim(),scope:form.elements['ai-scope'].value};
     settingsBusy=true;render();
     try {
       status=await (key?native().saveKey({...options,key}):native().configure(options));

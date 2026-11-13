@@ -131,6 +131,19 @@ main:focus {outline:none}
 .search input[type=search] {border:none;background:none}
 #recipe-count {color:var(--muted);margin:0}
 #recipe-results .empty {grid-column:1/-1}
+.recipe-topbar {display:flex;align-items:center;justify-content:space-between}
+.recipe-cover {position:relative;align-self:stretch;min-width:0}
+.recipe-cover .favorite {top:14px;right:14px}
+.recipe-actions {width:100%;display:grid;gap:9px;max-width:420px}
+.recipe-secondary {display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.recipe-secondary .btn {min-height:46px;padding-inline:7px}
+.btn.start-cooking {position:relative;overflow:hidden;display:flex;flex-direction:row-reverse;justify-content:space-between;min-height:58px;border-radius:17px;padding-inline:18px;font-size:1.04rem;background-image:linear-gradient(110deg,transparent,#ffffff1c);box-shadow:0 7px 16px #0003}
+.start-cooking .icon {width:29px;height:29px;padding:5px;border-radius:50%;background:#ffffff28}
+@media(prefers-reduced-motion:no-preference) {
+  .btn.start-cooking {animation:cook-arrive .48s ease-out both;transition:transform .15s ease,filter .15s ease}
+  .btn.start-cooking:active {transform:scale(.98)}
+  @keyframes cook-arrive {from {opacity:.65;transform:translateY(4px)}}
+}
 .detail-top {display:grid;grid-template-columns:minmax(230px,.85fr) 1.15fr;gap:24px;align-items:center}
 .detail-top .photo {height:100%;min-height:310px;border-radius:var(--radius)}
 .detail-copy {display:grid;align-content:start;justify-items:start;gap:13px}

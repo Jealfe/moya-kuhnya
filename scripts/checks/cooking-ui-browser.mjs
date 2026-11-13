@@ -44,6 +44,18 @@ await page.evaluate(async()=>{const {openStorage}=await import('/storage.js');aw
 });});
 await page.reload();await page.locator('.ai-step').getByText('Мясо жёсткое',{exact:true}).waitFor();
 await page.goto('http://127.0.0.1:4174/#/recipe/pilaf');await page.locator('.detail-body').waitFor();assert.equal(await page.locator('main .ai-advice').count(),0);
+const start=page.getByRole('button',{name:'Начать готовить',exact:true});
+await start.waitFor();
+assert.ok(await start.evaluate(el=>el.classList.contains('start-cooking')));
+const heart=page.locator('.recipe-cover').getByRole('button',{name:'Избранное',exact:true});
+await heart.click();
+await page.waitForFunction(()=>document.querySelector('.recipe-cover .favorite').getAttribute('aria-pressed')==='true');
+await page.getByLabel('Действия с рецептом').click();
+await page.getByRole('link',{name:'Редактировать рецепт',exact:true}).waitFor();
+await page.keyboard.press('Escape');
+assert.equal(await page.getByRole('link',{name:'Редактировать рецепт',exact:true}).isVisible(),false);
+assert.equal(await page.locator('[data-do="export-recipe"]').count(),0);
+
 assert.equal(await page.evaluate(()=>window.__analysisRequests),0);assert.deepEqual(errors,[]);
 console.log('PASS: Android viewport, compact cooking plan, correct step advice, completed advice hidden, active snapshot, narrow screens, zero API requests');
 await browser.close();
