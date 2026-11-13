@@ -1,9 +1,11 @@
 import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import { recipeCatalog } from './recipe-catalog.mjs';
 
 await rm('dist', {recursive:true,force:true});
 await cp('public','dist',{recursive:true});
+await writeFile('dist/recipe-catalog.tsv',await recipeCatalog());
 const files = (await readdir('dist',{recursive:true,withFileTypes:true}))
   .filter(entry=>entry.isFile())
   .map(entry=>join(entry.parentPath,entry.name).slice(5).replaceAll('\\','/'))
