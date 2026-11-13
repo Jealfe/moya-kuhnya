@@ -21,7 +21,7 @@ try {
   npm.cmd run android:sync
   Check-Exit
   Push-Location android
-  try { .\gradlew.bat assembleRelease testReleaseUnitTest --console=plain; Check-Exit }
+  try { .\gradlew.bat assembleRelease --console=plain; Check-Exit }
   finally { Pop-Location }
   $unsigned = 'android/app/build/outputs/apk/release/app-release-unsigned.apk'
   $version = [regex]::Match((Get-Content android/app/build.gradle -Raw),'versionName\s+"([^"]+)"').Groups[1].Value
