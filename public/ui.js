@@ -1,3 +1,4 @@
+import { isAndroid, nativePlugin } from './native.js';
 import { amount, formatNumber, totalTime } from './core.js';
 
 export const h = value => String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -88,8 +89,17 @@ export const foodList = items => '<ul class="ingredients">'+items.map(item=>'<li
 export const stat = (label,value,symbol) => '<div class="stat panel"><span class="stat-icon">'+icon(symbol)+'</span><div><strong>'+h(value)+'</strong><span>'+h(label)+'</span></div></div>';
 export const ratingLabel = rating => rating ? formatNumber(rating)+' / 5' : 'Без оценки';
 export const clock = seconds => [Math.floor(seconds/60),seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
-export function saveFile(name,value) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
+export async function saveFile(name,value,{maxMb,share=false}={}) {
+  const content=JSON.stringify(value);
+  const blob=new Blob([content],{type:'application/json'});
+  if (maxMb && blob.size>maxMb*1024*1024) throw Error('Копия больше '+maxMb+' МБ. Уменьшите объём фото, чтобы её можно было восстановить.');
+  if (isAndroid()) {
+    const files=nativePlugin('KitchenFiles');
+    if (share) {await files.share({name,content});return false;}
+    const result=await files.save({name,content});
+    return result.saved===true;
+  }
+  const url = URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url; a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);

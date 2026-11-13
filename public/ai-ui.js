@@ -1,0 +1,172 @@
+import { isAndroid, nativePlugin } from './native.js';
+import { advicePlan, adviceForStep, analysisStale, createAnalysis, currentAdvice, latestAnalysis, recipeForEntry, reviewData, fingerprint, storeAnalysis } from './ai.js';
+import { button, dateLabel, field, h, input, list, select } from './ui.js';
+
+export function createAi({getState,findRecipe,change,render,showDialog,showError}) {
+  let status={hasKey:false,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'},connectionStatus='Подключение ещё не проверено.',models=[];
+  let busyEntry=null,settingsBusy=false,requestCancelled=false,schema;
+  const advice=new Map();
+  let sessionAdvice=null;
+  const native=()=>nativePlugin('GigaChat');
+  let adviceRevision=0;
+  async function refreshAdvice() {
+    const revision=++adviceRevision,state=getState(),next=new Map();
+    for (const id of new Set((state.aiAnalyses??[]).map(record=>record.recipeId))) {
+      const record=await currentAdvice(state,findRecipe(id));
+      if (record) next.set(id,record);
+    }
+    const nextSession=state.session?await currentAdvice(state,state.session.recipe):null;
+    // A slower refresh from an earlier click must not replace newer feedback.
+    if (revision!==adviceRevision) return;
+    advice.clear();
+    for (const [id,record] of next) advice.set(id,record);
+    sessionAdvice=nextSession;
+  }
+  async function initialize(resultSchema) {
+    schema=resultSchema;
+    if (isAndroid()) {
+      try {status=await native().status();} catch(error) {connectionStatus=error.message;}
+    }
+    await refreshAdvice();
+  }
+  function settings() {
+    if (!isAndroid()) return '<section class="panel padded"><h2>Искусственный интеллект</h2><p>GigaChat доступен в Android-приложении. Сохранённые анализы можно читать и переносить в JSON-копии.</p></section>';
+    const disabled=settingsBusy||busyEntry?'disabled':'';
+    const modelOptions=[...new Set([status.model,...models])].map(model=>[model,model]);
+    return '<section class="panel padded form-stack"><h2>Искусственный интеллект</h2><p>GigaChat анализирует рецепт и ваши текстовые отзывы только по нажатию кнопки. Фотографии не отправляются.</p>'+
+      '<form id="ai-settings" class="form-stack">'+field('Ключ авторизации GigaChat',input('gigachat-key','','type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8192" '+disabled))+
+      '<small>'+h(status.hasKey?'Ключ сохранён на устройстве. Оставьте поле пустым, чтобы сохранить только модель и тип доступа.':'Введите ключ авторизации из личного кабинета GigaChat.')+'</small>'+
+      field('Модель',select('ai-model',[...modelOptions,['','Указать вручную']],status.model,disabled))+
+      '<div data-custom-model hidden>'+field('Название модели',input('ai-custom-model','','maxlength="100" autocomplete="off" autocapitalize="off" spellcheck="false" disabled'))+'</div>'+
+      '<small>Чтобы загрузить список моделей, нажмите «Проверить подключение».</small>'+
+      field('Тип доступа',select('ai-scope',[['GIGACHAT_API_PERS','Личный'],['GIGACHAT_API_B2B','Бизнес (B2B)'],['GIGACHAT_API_CORP','Корпоративный']],status.scope,disabled))+
+      '<button class="btn primary" '+disabled+'>Сохранить настройки</button></form>'+
+      '<div class="actions">'+button('Проверить подключение','ai-connect',{disabled:Boolean(disabled)||!status.hasKey})+
+      button('Удалить ключ','ai-delete-key',{disabled:Boolean(disabled)||!status.hasKey,kind:'quiet danger'})+'</div>'+
+      '<p role="status">'+h(settingsBusy?'Выполняется…':connectionStatus)+'</p><small>Ключ защищён Android Keystore и не включается в JSON-копии. После удаления приложения введите его заново. На устройстве с root-доступом абсолютная защита секретов невозможна.</small></section>';
+  }
+  function entryControls(entry) {
+    if (entry.pending) return '';
+    const record=latestAnalysis(getState(),entry.id);
+    const controls=record?button('Рекомендации ИИ','ai-view',{id:entry.id}):'';
+    if (!isAndroid()) return controls;
+    if (busyEntry===entry.id) return controls+'<p role="status">GigaChat разбирает отзыв…</p>'+button('Отменить запрос','ai-cancel');
+    return controls+button(record?'Повторить анализ':'Разобрать ошибки с ИИ',record?'ai-repeat':'ai-analyze',{id:entry.id,disabled:busyEntry!==null||settingsBusy});
+  }
+  function feedbackButtons(record,i,j) {
+    const feedback=record.feedback.find(item=>item.issueIndex===i && item.recommendationIndex===j);
+    const id=record.id+':'+i+':'+j;
+    return '<div class="actions">'+button(feedback?.done?'Выполнено ✓':'Отметить выполненным','ai-done',{id,kind:feedback?.done?'active':'quiet'})+
+      button(feedback?.useful?'Полезно ✓':'Полезно','ai-useful',{id,kind:feedback?.useful?'active':'quiet'})+'</div>';
+  }
+  async function showResult(entryId) {
+    const state=getState(),entry=state.history.find(item=>item.id===entryId),record=latestAnalysis(state,entryId);
+    if (!record||!entry) throw Error('Анализ больше не доступен.');
+    const recipe=recipeForEntry(entry,findRecipe(entry.recipeId));
+    const stale=await analysisStale(record,entry,recipe);
+    const result=record.result;
+    showDialog('Разбор приготовления',
+      '<p class="muted">'+h(entry.name)+' · '+h(dateLabel(record.at))+'</p>'+
+      (stale?'<p class="info">Отзыв или рецепт изменён. Рекомендации могут быть устаревшими; выполните новый анализ.</p>':'')+
+      '<p>'+h(result.summary)+'</p>'+result.issues.map((issue,i)=>'<section class="ai-issue"><h3>'+h(issue.title)+'</h3>'+
+        (issue.possibleCauses.length?'<h4>Возможные причины</h4>'+list(issue.possibleCauses):'')+
+        '<h4>Рекомендации</h4><ul>'+issue.recommendations.map((text,j)=>'<li>'+h(text)+feedbackButtons(record,i,j)+'</li>').join('')+'</ul>'+
+        (issue.stepIndexes.length?'<p class="muted">Шаги: '+issue.stepIndexes.map(index=>index+1).join(', ')+'</p>':'')+'</section>').join('')+
+      (result.nextTimeChecklist.length?'<h3>План следующей готовки</h3>'+list(result.nextTimeChecklist):'')+
+      (result.questions.length?'<h3>Что уточнить</h3>'+list(result.questions)+'<p class="muted">Уточнения можно сохранить в заметках следующей попытки — они будут учтены при новом анализе.</p>':'')+
+      (isAndroid()?button('Повторить анализ','ai-repeat',{id:entryId,disabled:busyEntry!==null||settingsBusy}):''));
+  }
+  function beforeCooking(recipeId,compact=false) {
+    const record=compact?sessionAdvice:advice.get(recipeId);
+    if (!record || record.recipeId!==recipeId) return '';
+    const items=advicePlan(record);
+    if (!items.length) return '';
+    const body='<ul class="ai-plan-list">'+items.slice(0,6).map(item=>'<li>'+h(item.text)+
+      (item.stepIndexes.length?'<small>Шаги '+item.stepIndexes.map(index=>index+1).join(', ')+'</small>':'')+'</li>').join('')+'</ul>'+
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'});
+    return compact?'<details class="panel padded ai-advice ai-plan"><summary>На что обратить внимание в этот раз <span aria-label="Активных советов: '+items.length+'">'+items.length+'</span></summary>'+body+'</details>':
+      '<section class="panel padded ai-advice"><h2>На что обратить внимание в этот раз</h2>'+body+'</section>';
+  }
+  function stepAdvice(recipeId,index) {
+    const record=sessionAdvice?.recipeId===recipeId?sessionAdvice:null,items=adviceForStep(record,index);
+    return items.length?'<section class="ai-advice ai-step" aria-label="Советы ИИ для текущего шага"><span class="kicker">Из прошлой готовки · ИИ</span><h3>На этом шаге обратите внимание</h3>'+items.map(item=>
+      '<div class="ai-step-item"><strong>'+h(item.title)+'</strong><p>'+h(item.text)+'</p>'+feedbackButtons(record,item.issueIndex,item.recommendationIndex)+'</div>').join('')+
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'})+'</section>':'';
+  }
+  async function analyze(entryId,repeat=false) {
+    if (busyEntry!==null||settingsBusy) return;
+    const state=getState(),entry=state.history.find(item=>item.id===entryId && !item.pending);
+    if (!entry) throw Error('Сначала сохраните отзыв.');
+    if (!repeat && latestAnalysis(state,entryId)) {await showResult(entryId);return;}
+    if (!isAndroid()) throw Error('Анализ доступен в Android-приложении.');
+    if (!status.hasKey) {location.hash='/settings';throw Error('Сохраните ключ GigaChat в настройках.');}
+    const recipe=recipeForEntry(entry,findRecipe(entry.recipeId));
+    if (!recipe) throw Error('Рецепт больше не доступен.');
+    document.querySelector('#dialog')?.close();
+    const requestingRoute=location.hash;
+    requestCancelled=false;busyEntry=entryId;render();
+    try {
+      const record=await createAnalysis({recipe,entry,state,schema,request:payload=>{if(requestCancelled)throw Error('Запрос отменён.');return native().analyze(payload);}});
+      if(requestCancelled)throw Error('Запрос отменён.');
+      const current=getState().history.find(item=>item.id===entryId);
+      if (!current || await fingerprint(reviewData(current))!==record.reviewHash) throw Error('Отзыв изменился. Выполните новый анализ.');
+      await change(currentState=>storeAnalysis(currentState,record));
+      if (location.hash===requestingRoute && !document.querySelector('dialog[open]')) await showResult(entryId);
+    } catch(error) {
+      if (location.hash===requestingRoute && !document.querySelector('dialog[open]')) throw error;
+    } finally {
+      busyEntry=null;
+      if (location.hash===requestingRoute) render();
+    }
+  }
+  async function save(form) {
+    if (settingsBusy||busyEntry) return;
+    const field=form.elements['gigachat-key'];
+    let key=field.value.trim();field.value='';
+    const options={model:(form.elements['ai-model'].value || form.elements['ai-custom-model'].value).trim(),scope:form.elements['ai-scope'].value};
+    settingsBusy=true;render();
+    try {
+      status=await (key?native().saveKey({...options,key}):native().configure(options));
+      connectionStatus=status.hasKey?'Настройки сохранены. Нажмите «Проверить подключение».':'Настройки сохранены. Введите ключ.';
+    } finally {key='';settingsBusy=false;render();}
+  }
+  async function action(action,id) {
+    switch(action) {
+      case 'ai-view': return showResult(id);
+      case 'ai-analyze': return analyze(id);
+      case 'ai-repeat': return analyze(id,true);
+      case 'ai-cancel': requestCancelled=true;return native().cancel();
+      case 'ai-connect':
+      case 'ai-delete-key': {
+        if(settingsBusy||busyEntry)return;
+        settingsBusy=true;render();
+        try {
+          if(action==='ai-connect') {
+            const response=await native().checkConnection();status=response;models=response.models??[];
+            connectionStatus='Подключение работает. '+(models.includes(status.model)?'Модель доступна.':'Выберите модель из полученного списка.');
+          } else {status=await native().deleteKey();models=[];connectionStatus='Ключ удалён с устройства.';}
+        } catch(error) {connectionStatus=error.message;throw error;}
+        finally {settingsBusy=false;render();}
+        return;
+      }
+      case 'ai-done':
+      case 'ai-useful': {
+        const inlineDone=action==='ai-done' && location.hash==='#/cook' && !document.querySelector('#dialog')?.open;
+        const [recordId,i,j]=id.split(':');let entryId;
+        await change(state=>{
+          const record=state.aiAnalyses?.find(item=>item.id===recordId);
+          if(!record?.result.issues[+i]?.recommendations[+j])throw Error('Рекомендация уже изменилась.');
+          entryId=record.entryId;
+          let feedback=record.feedback.find(item=>item.issueIndex===+i&&item.recommendationIndex===+j);
+          if(!feedback){feedback={issueIndex:+i,recommendationIndex:+j,done:false,useful:false};record.feedback.push(feedback);}
+          const key=action==='ai-done'?'done':'useful';feedback[key]=!feedback[key];
+        });
+        render();
+        if(document.querySelector('#dialog')?.open)await showResult(entryId);
+        else if(inlineDone)document.querySelector('.cook-step')?.scrollIntoView({block:'start'});
+        return;
+      }
+    }
+  }
+  return {initialize,refreshAdvice,settings,entryControls,beforeCooking,stepAdvice,action,save:form=>save(form).catch(showError)};
+}
