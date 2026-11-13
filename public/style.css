@@ -317,8 +317,8 @@ dialog .detail-body {margin-top:15px}
 .ai-advice {margin-bottom:18px}
 #ai-settings input[type=password] {font-family:monospace}
 
-/* SystemBars keeps the entire Android WebView inside status/cutout/navigation insets. */
-html[data-platform=android] body {padding-top:6px}
+/* Match the backdrop behind the Android system bars to the adjacent app surfaces. */
+html[data-platform=android] #navigation {background:var(--bg)}
 .ai-plan > summary {display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:650;min-height:44px}
 .ai-plan > summary span {border-radius:20px;background:var(--chip);color:var(--olive);padding:4px 10px}
 .ai-plan-list {padding-left:22px;line-height:1.6}

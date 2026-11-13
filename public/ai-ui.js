@@ -60,7 +60,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
   async function showResult(entryId) {
     const state=getState(),entry=state.history.find(item=>item.id===entryId),record=latestAnalysis(state,entryId);
     if (!record||!entry) throw Error('Анализ больше не доступен.');
-    const recipe=findRecipe(entry.recipeId);
+    const recipe=recipeForEntry(entry,findRecipe(entry.recipeId));
     const stale=await analysisStale(record,entry,recipe);
     const result=record.result;
     showDialog('Разбор приготовления',
@@ -101,6 +101,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     const recipe=recipeForEntry(entry,findRecipe(entry.recipeId));
     if (!recipe) throw Error('Рецепт больше не доступен.');
     document.querySelector('#dialog')?.close();
+    const requestingRoute=location.hash;
     requestCancelled=false;busyEntry=entryId;render();
     try {
       const record=await createAnalysis({recipe,entry,state,schema,request:payload=>{if(requestCancelled)throw Error('Запрос отменён.');return native().analyze(payload);}});
@@ -108,7 +109,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       const current=getState().history.find(item=>item.id===entryId);
       if (!current || await fingerprint(reviewData(current))!==record.reviewHash) throw Error('Отзыв изменился. Выполните новый анализ.');
       await change(currentState=>storeAnalysis(currentState,record));
-      await showResult(entryId);
+      if (location.hash===requestingRoute && !document.querySelector('#dialog')?.open) await showResult(entryId);
     } finally {busyEntry=null;render();}
   }
   async function save(form) {

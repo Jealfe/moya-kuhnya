@@ -23,7 +23,7 @@ await page.evaluate(async()=>{
 await page.goto('http://127.0.0.1:4174/#/cook');await page.reload();await page.locator('.cook-step').waitFor();
 assert.equal(await page.locator('html').getAttribute('data-platform'),'android');
 assert.equal(await page.locator('meta[name=viewport]').getAttribute('content'),'width=device-width, initial-scale=1, viewport-fit=contain');
-assert.ok(await page.locator('#header').evaluate(el=>el.getBoundingClientRect().top)>=6);
+assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).paddingTop),'0px');
 assert.equal(await page.locator('details.ai-plan').getAttribute('open'),null);
 assert.equal(await page.locator('.cook-step .ai-step').count(),0);
 await page.locator('.step-nav button').nth(1).click();await page.locator('.ai-step').waitFor();

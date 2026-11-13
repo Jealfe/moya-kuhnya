@@ -13,7 +13,7 @@ try {
     await setTimeout(100);
   }
   if(!ready)throw Error('Сервер не запустился вовремя.');
-  for(const file of ['web-browser.mjs','files-browser.mjs','ai-browser.mjs','cooking-ui-browser.mjs']) {
+  for(const file of ['web-browser.mjs','files-browser.mjs','ai-browser.mjs','cooking-ui-browser.mjs','backup-browser.mjs']) {
     await new Promise((resolve,reject)=>{
       const child=spawn(process.execPath,['scripts/checks/'+file],{stdio:'inherit',env:process.env});
       child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error(file+': '+code)));

@@ -1,5 +1,6 @@
 import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
+import { createAutoBackup } from './auto-backup.js';
 import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
@@ -26,7 +27,8 @@ let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
-const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate),render:()=>render(),showDialog,showError:error=>showError(error)});
+const autoBackup=createAutoBackup({getState:()=>state,notice:message=>say(message)});
+const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate,{backup:true}),render:()=>render(),showDialog,showError:error=>showError(error)});
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
 const navigate = (path) => { location.hash='/'+path; };
@@ -63,22 +65,28 @@ function confirmAction(title,message,label,action,id='') {
 }
 const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>'+
   (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
-async function change(mutate) {
+async function change(mutate,{backup=false}={}) {
   state=await storage.change(current=>{mutate(current); return current;});
+  if (backup) autoBackup.save(state);
   await ai.refreshAdvice();
 }
-async function changeSession(mutate) {
+async function changeSession(mutate,options) {
   const id=state.session?.id;
   await change(current=>{
     if (!current.session || current.session.id!==id) throw Error('Готовка уже изменилась в другой вкладке.');
     mutate(current.session,current);
-  });
+  },options);
 }
 
+function syncSystemBars() {
+  const device=globalThis.Capacitor?.Plugins?.KitchenDevice;
+  if (isAndroid() && device) void device.setTheme({light:state.settings.theme==='light'}).catch(()=>{});
+}
 function render({focus=false}={}) {
   if (!state) return;
   const [page,id,origin]=route();
   const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
+  if (document.documentElement.dataset.theme!==state.settings.theme) syncSystemBars();
   document.documentElement.dataset.theme=state.settings.theme;
   document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#181a15':'#f6f2e8';
   const recipes=catalogItems();
@@ -113,7 +121,7 @@ function render({focus=false}={}) {
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
     case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
-    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent),ai); break;
+    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent),ai)+autoBackup.panel(); break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);
@@ -336,7 +344,7 @@ async function finishCooking(pending=true,report={}) {
     updateAutomaticStatus(current,entry.recipeId);
     if (current.planned===entry.recipeId) current.planned=null;
     current.session=null;
-  });
+  },{backup:true});
   return entry;
 }
 
@@ -434,6 +442,11 @@ async function onAction(action,id) {
       fileDialog('import');
       return;
     }
+    case 'auto-backup-folder':
+    case 'auto-backup-now':
+    case 'auto-backup-off':
+      await autoBackup.action(action);
+      break;
     case 'restore': fileDialog('restore'); return;
     case 'backup': await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
     case 'restore-confirm': {
@@ -442,6 +455,7 @@ async function onAction(action,id) {
       dialog.close();
       say('Восстанавливаем данные…');
       state=await storage.change(()=>snapshot);
+      autoBackup.save(state);
       await ai.refreshAdvice();
       say('Данные восстановлены');
       break;
@@ -537,7 +551,7 @@ async function onAction(action,id) {
           else updateAutomaticStatus(current,entry.recipeId);
           removed=true;
         }
-      });
+      },{backup:true});
       dialog.close();
       if (removed) persistDraft('report/'+id,null);
       say(removed?'Запись удалена из истории':'Запись уже удалена');
@@ -747,7 +761,7 @@ document.addEventListener('submit',event=>{
           delete entry.pending;
           recipeId=entry.recipeId;
           updateAutomaticStatus(current,recipeId);
-        });
+        },{backup:true});
         persistDraft(key,null);
         say('Впечатления сохранены');
         navigate('history/'+recipeId);
@@ -796,7 +810,11 @@ addEventListener('appinstalled',()=>{installEvent=null;softRender();say('При�
 addEventListener('hashchange',onRoute);
 addEventListener('online',softRender);
 addEventListener('offline',softRender);
-document.addEventListener('visibilitychange',()=>{refreshWake();tick();});
+document.addEventListener('visibilitychange',()=>{
+  refreshWake();
+  tick();
+  if (state && !document.hidden) syncSystemBars();
+});
 dialog.addEventListener('close',()=>{restoreData=null;importRows=null;});
 setInterval(tick,250);
 try {
@@ -811,7 +829,8 @@ try {
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
   pantry=createPantry(pantryDialog,storage,savedPantry);
   featuredId='pilaf';
-  await ai.initialize(aiSchema);
+  await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
+  syncSystemBars();
   onRoute();
   tick();
   void setupWorker();
