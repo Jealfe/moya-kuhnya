@@ -51,7 +51,7 @@ function resultContent(recipes,{products,useBasics}) {
     '</div><div class="pantry-footer"><button class="btn primary" type="button" data-pantry-edit>Изменить список</button></div></div>';
 }
 
-export function createPantry(dialog,storage,initialPantry) {
+export function createPantry(dialog,storage,initialPantry,onSaved) {
   let {products,useBasics}=initialPantry;
   let mode=null, catalog, currentRecipes, busy=false, resultsScroll=0;
   const get = selector => dialog.querySelector(selector);
@@ -117,6 +117,7 @@ export function createPantry(dialog,storage,initialPantry) {
           add.length?updateProducts(current.products,add,catalog):current.products,
         useBasics:basics??current.useBasics
       })));
+      onSaved();
       resultsScroll=0;
       if (mode==='edit' && input()===currentInput) {
         if (clearInput && currentInput.value===previous) currentInput.value='';
@@ -172,6 +173,7 @@ export function createPantry(dialog,storage,initialPantry) {
   });
 
   return {
+    restore(saved) { ({products,useBasics}=saved);resultsScroll=0; },
     show(next,recipes) {
       if (!next) {
         if (dialog.open) dialog.close();

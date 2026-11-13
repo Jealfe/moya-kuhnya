@@ -1,8 +1,9 @@
 import { installSelectMenus } from './select-menus.js';
 import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
+import { makeBackup, readBackup } from './backup.js';
 import { createAutoBackup } from './auto-backup.js';
-import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
@@ -28,7 +29,7 @@ let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
 let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
-const autoBackup=createAutoBackup({getState:()=>state,notice:message=>say(message)});
+const autoBackup=createAutoBackup({getBackup:async()=>makeBackup(await storage.readBackup()),notice:message=>say(message)});
 const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate,{backup:true}),render:()=>render(),showDialog,showError:error=>showError(error)});
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
@@ -38,7 +39,7 @@ const findRecipe = id => catalogItems().find(recipe=>recipe.id===id);
 const getPortions = recipe => portions.get(recipe.id) ?? recipe.servings;
 function persistDraft(key,value) {
   if (value===null) delete drafts[key]; else drafts[key]=structuredClone(value);
-  void storage.saveDraft(key,value).catch(()=>say('Не удалось сохранить черновик на устройстве.'));
+  void storage.saveDraft(key,value).then(()=>autoBackup.schedule()).catch(()=>say('Не удалось сохранить черновик на устройстве.'));
 }
 function saveReportDraft(form) {
   const key='report/'+form.dataset.entry;
@@ -68,7 +69,7 @@ const showError = error => showDialog('Проверьте данные','<ul cla
   (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
 async function change(mutate,{backup=false}={}) {
   state=await storage.change(current=>{mutate(current); return current;});
-  if (backup) autoBackup.save(state);
+  if (backup) void autoBackup.save(); else autoBackup.schedule();
   await ai.refreshAdvice();
 }
 async function changeSession(mutate,options) {
@@ -451,7 +452,7 @@ async function onAction(action,id) {
     case 'backup-share':
     case 'backup': {
       const saved=await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',
-        {format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()},{maxMb:256,share:action==='backup-share'});
+        await makeBackup(await storage.readBackup()),{maxMb:256,share:action==='backup-share'});
       if (isAndroid() && saved) say('Резервная копия сохранена');
       return;
     }
@@ -460,8 +461,14 @@ async function onAction(action,id) {
       if (!snapshot) return;
       dialog.close();
       say('Восстанавливаем данные…');
-      state=await storage.change(()=>snapshot);
-      autoBackup.save(state);
+      state=await storage.restoreBackup(snapshot);
+      if (snapshot.drafts) {
+        drafts=Object.fromEntries(snapshot.drafts.map(({id,value})=>[id,value]));
+        draft=null;
+        draftKey=null;
+      }
+      if (snapshot.pantry) pantry.restore(snapshot.pantry);
+      void autoBackup.save();
       await ai.refreshAdvice();
       say('Данные восстановлены');
       break;
@@ -736,8 +743,9 @@ document.addEventListener('submit',event=>{
         return;
       }
       case 'restore-file': {
-        restoreData=parseBackup(await readJson(form.elements.file.files[0],256),exchange.backup,exchange.legacyBackup);
-        const summary='Рецептов: '+restoreData.recipes.length+' · Записей дневника: '+restoreData.history.length+' · Покупок: '+shoppingSections(restoreData).reduce((sum,section)=>sum+section.items.length,0)+'.';
+        restoreData=readBackup(await readJson(form.elements.file.files[0],256),exchange);
+        const restored=restoreData.state;
+        const summary='Рецептов: '+restored.recipes.length+' · Записей дневника: '+restored.history.length+' · Покупок: '+shoppingSections(restored).reduce((sum,section)=>sum+section.items.length,0)+'.';
         confirmAction('Заменить локальные данные?',summary+' Существующие данные этого приложения будут заменены содержимым копии.','Восстановить данные','restore-confirm');
         return;
       }
@@ -843,7 +851,7 @@ try {
     storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts(),storage.readPantry()
   ]);
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
-  pantry=createPantry(pantryDialog,storage,savedPantry);
+  pantry=createPantry(pantryDialog,storage,savedPantry,()=>autoBackup.schedule());
   featuredId='pilaf';
   await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
   syncSystemBars();

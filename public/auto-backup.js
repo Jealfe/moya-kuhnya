@@ -2,39 +2,55 @@
 import { isAndroid, nativePlugin } from './native.js';
 import { button, h } from './ui.js';
 
-export function createAutoBackup({getState,notice}) {
-  let enabled=false, initialized=false, writing=null, pending=null, lastSaved=null, failed=false;
+export function createAutoBackup({getBackup,notice}) {
+  let enabled=false, initialized=false, writing=null, pending=false, lastSaved=null, failed=false, delay;
   const native = () => nativePlugin('KitchenDevice');
 
-  function save(state) {
+  function save() {
+    clearTimeout(delay);
     if (!enabled) return;
-    pending=state;
-    if (writing) return;
+    pending=true;
+    if (writing) return writing;
     writing=(async()=>{
       while (pending && enabled) {
-        const current=pending;
-        pending=null;
+        pending=false;
         try {
           // Same versioned format as manual export. The native module alternates files.
-          const content=JSON.stringify({format:'moya-kuhnya-backup',version:2,created:Date.now(),data:current});
+          const content=JSON.stringify(await getBackup());
           if (new Blob([content]).size>256*1024*1024) throw Error('Автокопия превышает 256 МБ. Для восстановления приложение принимает файлы до 256 МБ.');
           await native().writeBackup({content});
           lastSaved=Date.now();
           failed=false;
+          remember();
         } catch (error) {
           if (!failed) notice(error.message);
           failed=true;
+          remember();
         }
       }
     })().finally(()=>{writing=null;});
+    return writing;
   }
 
+  function remember() {
+    try {localStorage.setItem('auto-backup-status',JSON.stringify({lastSaved,failed}));} catch {}
+  }
   return {
+    schedule() {
+      if (!enabled) return;
+      clearTimeout(delay);
+      delay=setTimeout(save,2000);
+    },
     async initialize() {
       if (!isAndroid()) return;
       try {
         enabled=(await native().backupStatus()).enabled;
         initialized=true;
+        try {
+          const saved=JSON.parse(localStorage.getItem('auto-backup-status'));
+          lastSaved=saved?.lastSaved??null;
+          failed=saved?.failed===true;
+        } catch {}
       } catch { /* Existing bridge versions keep manual export. */ }
     },
     save,
@@ -43,22 +59,25 @@ export function createAutoBackup({getState,notice}) {
       if (action==='auto-backup-off') {
         await native().disableBackup();
         enabled=false;
+        clearTimeout(delay);
         failed=false;
+        lastSaved=null;
+        remember();
         return;
       }
       if (action==='auto-backup-folder') {
         const result=await native().chooseBackupFolder();
         if (result.cancelled) return;
         enabled=result.enabled;
+        lastSaved=null;
       }
-      save(getState());
-      await writing;
+      await save();
       if (!failed) notice('Автокопия сохранена');
     },
     panel() {
       if (!initialized) return '';
       return '<section class="panel padded form-stack"><h2>Автокопия дневника</h2>'+
-        '<p>Выберите папку вне приложения. После изменения дневника приложение сохранит копию вместе с фото и рекомендациями ИИ. После переустановки выберите свежий файл в «Восстановить из файла».</p>'+
+        '<p>Выберите папку вне приложения. Приложение обновляет копию после изменений, включая дневник, рецепты, покупки, список продуктов и черновики. После переустановки выберите свежий файл в «Восстановить из файла».</p>'+
         '<p class="muted">'+(failed?'Последняя запись копии не удалась.':lastSaved?'Последняя копия: '+h(new Date(lastSaved).toLocaleString('ru-RU')):enabled?'Автокопия включена.':'Автокопия выключена.')+'</p>'+
         '<div class="actions">'+button(enabled?'Сменить папку':'Выбрать папку','auto-backup-folder',{kind:'primary'})+
         (enabled?button('Сохранить сейчас','auto-backup-now')+button('Отключить','auto-backup-off',{kind:'quiet'}):'')+'</div></section>';

@@ -18,6 +18,12 @@ try {
     }};
   });
   await page.goto('http://127.0.0.1:4174/#/settings');
+  await page.evaluate(async()=>{
+    const {openStorage}=await import('/storage.js');
+    const db=await openStorage();
+    await db.changePantry(()=>({products:['Картофель'],useBasics:false}));
+    await db.saveDraft('editor-photo/',new File([new Uint8Array(3*1024*1024)],'test.webp',{type:'image/webp'}));
+  });
   await page.getByRole('button',{name:'Выбрать папку',exact:true}).click();
   await page.getByText('Автокопия сохранена',{exact:true}).waitFor();
   await page.goto('http://127.0.0.1:4174/#/recipe/pilaf');
@@ -31,6 +37,7 @@ try {
   assert.equal(JSON.parse(json).data.history.length,1);
   await page.goto('http://127.0.0.1:4174/#/settings');
   await page.reload();
+  await page.getByText(/Последняя копия:/).waitFor();
   await page.getByRole('button',{name:'Отключить',exact:true}).click();
   await page.getByRole('button',{name:'Выбрать папку',exact:true}).waitFor();
   const fresh=await browser.newPage();
@@ -40,6 +47,13 @@ try {
   await fresh.getByRole('button',{name:'Проверить файл'}).click();
   await fresh.getByRole('button',{name:'Восстановить данные'}).click();
   await fresh.getByText('Данные восстановлены',{exact:true}).waitFor();
+  const restored=await fresh.evaluate(async()=>{
+    const {openStorage}=await import('/storage.js');
+    const db=await openStorage();
+    const draft=(await db.readDrafts())['editor-photo/'];
+    return {pantry:await db.readPantry(),name:draft.name,size:draft.size};
+  });
+  assert.deepEqual(restored,{pantry:{products:['Картофель'],useBasics:false},name:'test.webp',size:3*1024*1024});
   await fresh.goto('http://127.0.0.1:4174/#/history');
   await fresh.getByText('Отзыв для автокопии',{exact:true}).waitFor();
   console.log('PASS: automatic diary backup and restore in a new profile');
