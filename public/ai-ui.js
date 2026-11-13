@@ -8,14 +8,19 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
   const advice=new Map();
   let sessionAdvice=null;
   const native=()=>nativePlugin('GigaChat');
+  let adviceRevision=0;
   async function refreshAdvice() {
-    advice.clear();
-    sessionAdvice=null;
-    for (const id of new Set((getState().aiAnalyses??[]).map(record=>record.recipeId))) {
-      const record=await currentAdvice(getState(),findRecipe(id));
-      if (record) advice.set(id,record);
+    const revision=++adviceRevision,state=getState(),next=new Map();
+    for (const id of new Set((state.aiAnalyses??[]).map(record=>record.recipeId))) {
+      const record=await currentAdvice(state,findRecipe(id));
+      if (record) next.set(id,record);
     }
-    if (getState().session) sessionAdvice=await currentAdvice(getState(),getState().session.recipe);
+    const nextSession=state.session?await currentAdvice(state,state.session.recipe):null;
+    // A slower refresh from an earlier click must not replace newer feedback.
+    if (revision!==adviceRevision) return;
+    advice.clear();
+    for (const [id,record] of next) advice.set(id,record);
+    sessionAdvice=nextSession;
   }
   async function initialize(resultSchema) {
     schema=resultSchema;

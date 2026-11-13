@@ -113,3 +113,15 @@ test('план и шаги исключают выполненные совет�
  assert.deepEqual(adviceForStep(record,0).map(item=>item.text),['Добавлять жидкость понемногу']);
  record.feedback.push({issueIndex:0,recommendationIndex:1,done:true,useful:false});assert.deepEqual(advicePlan(record),[]);
 });
+
+test('запоздавшее обновление подсказок не перезаписывает более новые данные',async t=>{
+ const {createAi}=await import('../public/ai-ui.js');
+ const oldState=initialState();oldState.history=[entry()];const old=await analyzed(oldState);old.result.issues[0].recommendations=['Старый совет'];storeAnalysis(oldState,old);
+ const newState=structuredClone(oldState);newState.aiAnalyses[0].result.issues[0].recommendations=['Новый совет'];
+ let current=oldState;const ai=createAi({getState:()=>current,findRecipe:()=>recipe,change:()=>{},render:()=>{},showDialog:()=>{},showError:()=>{}});
+ const original=crypto.subtle.digest.bind(crypto.subtle);let unblock;const gate=new Promise(resolve=>unblock=resolve);let first=true;
+ t.mock.method(crypto.subtle,'digest',async(...args)=>{if(first){first=false;await gate;}return original(...args);});
+ const slow=ai.refreshAdvice();current=newState;await ai.refreshAdvice();unblock();await slow;
+ assert.ok(ai.beforeCooking(recipe.id).includes('Новый совет'));
+ assert.ok(!ai.beforeCooking(recipe.id).includes('Старый совет'));
+});
