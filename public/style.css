@@ -351,3 +351,57 @@ html[data-platform=android] #navigation {background:var(--bg)}
 .ai-step .actions .btn {min-height:44px}
 .ai-plan > summary::after {content:'⌄';color:var(--olive);font-size:1.2rem}
 .ai-plan[open] > summary::after {content:'⌃'}
+
+@font-face {
+  font-family:Lora;
+  src:url("./fonts/lora.ttf") format("truetype");
+  font-style:normal;
+  font-weight:400 700;
+  font-display:swap;
+}
+:root {
+  --serif:Lora,Georgia,serif;
+  --lift:0 9px 25px #080a082e,0 2px 5px #080a081a;
+  --sheen:#ffffff08;
+}
+:root[data-theme=light] {
+  --lift:0 9px 25px #50351d13,0 2px 5px #50351d0a;
+  --sheen:#ffffff70;
+}
+h1,h2,h3 {letter-spacing:-.035em}
+h1,h2 {font-weight:550}
+.hero {
+  background:radial-gradient(ellipse at 0% 0%,#76604445,transparent 65%),#292e22;
+  box-shadow:var(--shadow);
+}
+.hero-copy h1 {line-height:1.08}
+.hero-copy .kicker {color:#e9bd91}
+.hero-copy .kicker::before {content:"";width:23px;height:2px;border-radius:2px;background:currentColor}
+.hero-art::after {background:linear-gradient(0deg,#100d0be8,transparent 62%)}
+.recipe-card,.entry,.stat,.resume,.shopping-group,.cook-step {
+  box-shadow:var(--lift);
+}
+.recipe-card,.entry,.stat {background-image:linear-gradient(155deg,var(--sheen),transparent 45%)}
+.recipe-card h3 {font-weight:550}
+.stat strong {font-weight:600;color:var(--olive)}
+.detail-copy .kicker,.cook-step .kicker {border-left:2px solid var(--brand);padding-left:9px}
+.recipe-cover .photo {box-shadow:var(--lift)}
+.nav-inner a {position:relative}
+.nav-inner a[aria-current]::after {
+  content:"";position:absolute;top:0;left:calc(50% - 8px);width:16px;height:2px;
+  border-radius:3px;background:var(--olive);
+}
+#header {box-shadow:0 2px 8px #0000000d}
+@media(max-width:620px) {
+  .hero-copy h1 {font-size:clamp(1.8rem,7vw,2.4rem)}
+  .recipe-card h3 {font-size:clamp(1rem,4.3vw,1.18rem)}
+}
+@media(prefers-reduced-motion:no-preference) {
+  .hero,.detail-top,.cook-step {animation:kitchen-appear .28s ease-out both}
+  .btn:not(.start-cooking),.favorite,.nav-inner a {transition:background .16s,color .16s,border-color .16s,transform .16s,box-shadow .16s}
+  .btn:not(:disabled):active,.favorite:active,.nav-inner a:active {scale:.97}
+  .favorite .icon {transition:transform .2s ease,fill .2s ease}
+  .favorite.selected .icon {animation:heart-pop .28s ease-out}
+  @keyframes kitchen-appear {from {opacity:.75;transform:translateY(5px)}}
+  @keyframes heart-pop {50% {transform:scale(1.2)}}
+}
