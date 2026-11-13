@@ -318,6 +318,11 @@ dialog .detail-body {margin-top:15px}
 #ai-settings input[type=password] {font-family:monospace}
 
 /* Match the backdrop behind the Android system bars to the adjacent app surfaces. */
+html[data-platform=android] body {
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px);
+}
 html[data-platform=android] #navigation {background:var(--bg)}
 .ai-plan > summary {display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:650;min-height:44px}
 .ai-plan > summary span {border-radius:20px;background:var(--chip);color:var(--olive);padding:4px 10px}

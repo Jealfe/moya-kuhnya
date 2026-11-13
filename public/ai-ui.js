@@ -109,8 +109,13 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       const current=getState().history.find(item=>item.id===entryId);
       if (!current || await fingerprint(reviewData(current))!==record.reviewHash) throw Error('Отзыв изменился. Выполните новый анализ.');
       await change(currentState=>storeAnalysis(currentState,record));
-      if (location.hash===requestingRoute && !document.querySelector('#dialog')?.open) await showResult(entryId);
-    } finally {busyEntry=null;render();}
+      if (location.hash===requestingRoute && !document.querySelector('dialog[open]')) await showResult(entryId);
+    } catch(error) {
+      if (location.hash===requestingRoute && !document.querySelector('dialog[open]')) throw error;
+    } finally {
+      busyEntry=null;
+      if (location.hash===requestingRoute) render();
+    }
   }
   async function save(form) {
     if (settingsBusy||busyEntry) return;
