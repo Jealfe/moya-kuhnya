@@ -472,3 +472,15 @@ html {background:var(--bg)}
   .nav-inner a[aria-current]::after {animation:nav-mark .24s ease-out}
   @keyframes nav-mark {from {transform:scaleX(.4);opacity:.4}}
 }
+
+.select-wrap {display:block;width:100%;min-width:0}
+.activity-heading>.select-wrap {width:auto}
+.select-trigger {display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-align:left}
+.select-trigger span {overflow-wrap:anywhere;min-width:0}
+.select-trigger .icon {rotate:90deg;color:var(--olive)}
+.select-popup[open] {display:flex;flex-direction:column;width:min(420px,calc(100% - 24px));max-height:min(68dvh,520px);padding:14px;overflow:hidden}
+.select-popup .dialog-heading {flex:none;margin-bottom:7px}
+.select-popup h2 {font-size:1.25rem}
+.select-choices {display:grid;overflow:auto;overscroll-behavior:contain;padding:3px}
+.select-choices button {text-align:left;min-height:44px;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;overflow-wrap:anywhere}
+.select-choices button[aria-pressed=true] {background:var(--chip);color:var(--olive);border-radius:8px;font-weight:650}

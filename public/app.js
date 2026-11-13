@@ -1,3 +1,4 @@
+import { installSelectMenus } from './select-menus.js';
 import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
 import { createAutoBackup } from './auto-backup.js';
@@ -830,6 +831,7 @@ document.addEventListener('visibilitychange',()=>{
   if (state && !document.hidden) syncSystemBars();
 });
 dialog.addEventListener('close',()=>{restoreData=null;importRows=null;});
+installSelectMenus();
 setInterval(tick,250);
 try {
   main.innerHTML='<p class="loading">Открываем «Мою кухню»…</p>';
