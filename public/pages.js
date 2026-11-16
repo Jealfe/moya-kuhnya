@@ -185,8 +185,12 @@ export function historyPage(state,recipeId,period,ai=null,findRecipe) {
     (entry.image?photo(entry.image,'Фото готового блюда «'+entry.name+'»'):'')+'<div class="padded"><span class="kicker">'+h(dateLabel(entry.at))+'</span><h3>'+
     (findRecipe?.(entry.recipeId)?'<a class="history-recipe-link" href="#/recipe/'+h(entry.recipeId)+'">'+h(entry.name)+'</a>':h(entry.name))+'</h3>'+
     '<div class="pills"><span>'+icon('star')+' '+impressionLabel(entry)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
-    notes(entry)+'<div class="actions">'+(ai?.entryControls(entry)??'')+link(entry.pending?'Оценить':'Редактировать отзыв','impression/'+entry.id,{kind:entry.pending?'primary':'quiet'})+(recipeId?'':link('Все попытки блюда','history/'+entry.recipeId,{kind:'quiet',symbol:'arrow'}))+
-    button('Удалить запись','history-delete',{id:entry.id,kind:'quiet danger'})+'</div></div></article>').join('')+'</div>':
+    notes(entry)+(ai?.entryControls(entry)??'')+'<div class="entry-footer">'+
+    link(entry.pending?'Оценить':'Править','impression/'+entry.id,{kind:entry.pending?'primary':'entry-footer-link',symbol:'edit'})+
+    (recipeId?'':link('Все попытки','history/'+entry.recipeId,{kind:'entry-footer-link',symbol:'arrow'}))+
+    '<details class="recipe-add-menu entry-menu"><summary class="btn" aria-label="Действия с записью">⋯</summary>'+
+    '<div class="panel recipe-add-actions">'+button('Удалить запись','history-delete',{id:entry.id,kind:'danger'})+
+    '</div></details></div></div></article>').join('')+'</div>':
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }
 

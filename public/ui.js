@@ -26,6 +26,7 @@ const paths = {
   trend:'m3 16 6-6 4 4 7-8m-5 0h5v5',
   star:'m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.4-5.7-3-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z',
   close:'m5 5 14 14M19 5 5 19',
+  edit:'m4 16-1 5 5-1L20 8l-4-4L4 16m10-10 4 4',
   pause:'M9 4v16m6-16v16'
 };
 export const icon = name => '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[name]+'"/></svg>';

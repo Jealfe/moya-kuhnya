@@ -48,10 +48,14 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
   function entryControls(entry) {
     if (entry.pending) return '';
     const record=latestAnalysis(getState(),entry.id);
-    const controls=record?button('Рекомендации ИИ','ai-view',{id:entry.id}):'';
-    if (!isAndroid()) return controls;
-    if (busyEntry===entry.id) return controls+'<p role="status">GigaChat разбирает отзыв…</p>'+button('Отменить запрос','ai-cancel');
-    return controls+button(record?'Повторить анализ':'Разобрать ошибки с ИИ',record?'ai-repeat':'ai-analyze',{id:entry.id,disabled:busyEntry!==null||settingsBusy});
+    if (!record && !isAndroid()) return '';
+    const disabled=busyEntry!==null||settingsBusy;
+    const main=record?button('Рекомендации ИИ','ai-view',{id:entry.id,kind:'entry-ai-main',symbol:'spark'}):
+      button('Разобрать ошибки с ИИ','ai-analyze',{id:entry.id,kind:'entry-ai-main',symbol:'spark',disabled});
+    const extra=!isAndroid()?'':busyEntry===entry.id?
+      '<div class="entry-ai-progress"><p role="status">GigaChat разбирает отзыв…</p>'+button('Отменить запрос','ai-cancel',{kind:'entry-ai-sub'})+'</div>':
+      record?button('Повторить анализ','ai-repeat',{id:entry.id,kind:'entry-ai-sub',symbol:'history',disabled}):'';
+    return '<div class="entry-ai">'+main+extra+'</div>';
   }
   function feedbackButtons(record,i,j) {
     const feedback=record.feedback.find(item=>item.issueIndex===i && item.recommendationIndex===j);

@@ -610,3 +610,20 @@ html {background:var(--bg)}
 [data-theme=atlas] .stat-icon {color:#FFB300}
 [data-theme=atlas] .stat strong {color:#D6BB78}
 [data-theme=atlas] .favorite.selected {color:var(--atlas-secondary)}
+
+.entry-ai {
+  display:grid;margin-top:14px;overflow:hidden;border:1px solid var(--line);border-radius:14px;
+  background:linear-gradient(140deg,var(--chip),var(--surface))
+}
+.entry-ai .btn {justify-content:flex-start;text-align:left;border:0;border-radius:0;padding-inline:13px}
+.entry-ai .entry-ai-main {min-height:50px;color:var(--ink);font-size:.98rem}
+.entry-ai-main .icon {color:var(--olive)}
+.entry-ai .entry-ai-sub {min-height:44px;color:var(--muted);border-top:1px solid var(--line)}
+.entry-ai .btn:focus-visible {outline-offset:-3px}
+.entry-ai-progress p {padding:0 13px;color:var(--muted)}
+.entry-footer {display:flex;align-items:center;gap:6px;margin-top:8px}
+.entry-footer-link.btn {padding-inline:7px;gap:5px;border-color:transparent;font-size:.82rem}
+.entry-footer-link+.entry-footer-link {border-left:1px solid var(--line);border-radius:0 9px 9px 0}
+.entry-menu {margin-left:auto;flex:none}
+.entry-menu .recipe-add-actions {top:auto;bottom:calc(100% + 4px)}
+.entry-menu summary.btn {font-size:1.2rem}

@@ -72,11 +72,17 @@ try {
   const note=page.getByLabel('Что получилось хорошо');
   await note.fill('Первая заметка');
   await page.getByRole('button',{name:'Сохранить впечатления'}).click();
-  await page.getByRole('link',{name:'Редактировать отзыв',exact:true}).click();
+  await page.getByRole('link',{name:'Править',exact:true}).click();
   assert.equal(await note.inputValue(),'Первая заметка');
   await note.fill('Заметка исправлена');
   await page.getByRole('button',{name:'Сохранить впечатления'}).click();
   await page.getByText('Заметка исправлена',{exact:true}).waitFor();
+  assert.equal(await page.locator('.entry').count(),1);
+  const remove=page.getByRole('button',{name:'Удалить запись',exact:true});
+  assert.equal(await remove.isVisible(),false);
+  await page.getByLabel('Действия с записью').click();
+  await remove.click();
+  await page.getByRole('dialog',{name:/Удалить/}).getByRole('button',{name:'Отмена',exact:true}).click();
   assert.equal(await page.locator('.entry').count(),1);
   await page.locator('.history-recipe-link').click();
   await page.waitForURL('**/#/recipe/pilaf');

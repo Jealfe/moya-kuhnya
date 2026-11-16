@@ -610,6 +610,7 @@ async function onAction(action,id) {
     case 'cook-cancel': confirmAction('Отменить готовку?','Шаги и таймеры этой попытки будут удалены.','Отменить готовку','cook-discard'); return;
     case 'cook-discard': await changeSession((session,current)=>{current.session=null;}); dialog.close(); navigate('home'); return;
     case 'history-delete': {
+      document.querySelector('.entry-menu[open]')?.removeAttribute('open');
       const entry=state.history.find(item=>item.id===id);
       if (!entry) return;
       confirmAction('Удалить запись?',
@@ -663,8 +664,9 @@ async function run(work) {
 }
 
 document.addEventListener('click',event=>{
-  const menu=document.querySelector('.recipe-add-menu[open]');
-  if (menu && !menu.contains(event.target)) menu.open=false;
+  for (const menu of document.querySelectorAll('.recipe-add-menu[open]')) {
+    if (!menu.contains(event.target)) menu.open=false;
+  }
   if (event.target.closest('.skip')) {
     event.preventDefault();
     main.focus();
