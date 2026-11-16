@@ -38,6 +38,7 @@ try {
   await page.goto('http://127.0.0.1:4174/#/settings/copies');
   await page.reload();
   await page.getByText(/Последняя копия:/).waitFor();
+  await page.getByLabel('Действия автокопии').click();
   await page.getByRole('button',{name:'Отключить',exact:true}).click();
   await page.getByRole('button',{name:'Выбрать папку',exact:true}).waitFor();
   const fresh=await browser.newPage();

@@ -676,6 +676,11 @@ document.addEventListener('click',event=>{
   if (state) unlockSound();
   const control=event.target.closest('[data-do]');
   if (!control) return;
+  const actionMenu=control.closest('.timer-menu,.shopping-menu');
+  if (actionMenu) {
+    actionMenu.open=false;
+    actionMenu.querySelector('summary').focus();
+  }
   if (control.dataset.do.startsWith('ai-')) {void ai.action(control.dataset.do,control.dataset.id).catch(showError); return;}
   if (control.dataset.do==='check-github') void checkGitHub();
   else void run(()=>onAction(control.dataset.do,control.dataset.id));

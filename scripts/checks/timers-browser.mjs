@@ -31,7 +31,9 @@ try {
   await count(1);
   await start.first().click();
   await count(2);
-  await page.locator('main [data-do="timer-reset"]:not(:disabled)').first().click();
+  const activeRow=page.locator('main .timer-row').filter({has:page.locator('[data-do="timer-reset"]:not(:disabled)')}).first();
+  await activeRow.locator('.timer-menu summary').click();
+  await activeRow.locator('[data-do="timer-reset"]').click();
   await count(1);
   await page.locator('[data-do="cook-finish"]').click();
   await count(0);

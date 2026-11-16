@@ -46,6 +46,11 @@ try {
   await first.getByRole('button',{name:'Есть дома',exact:true}).click();
   await page.locator('.shopping-at-home').getByText(product,{exact:true}).waitFor();
   assert.equal(await page.locator('.shopping-group .shopping-row').getByText(product,{exact:true}).count(),0);
+  const homeProduct=page.locator('.shopping-at-home .shopping-row').filter({hasText:product});
+  await homeProduct.locator('.shopping-menu summary').click();
+  await homeProduct.getByRole('button',{name:'Изменить',exact:true}).click();
+  await page.getByRole('dialog',{name:'Изменить продукт'}).waitFor();
+  await page.getByRole('button',{name:'Закрыть',exact:true}).click();
   await go('recipe/pilaf');
   await action('start').click();
   await page.locator('.step-ai-button').waitFor();
@@ -58,6 +63,7 @@ try {
   await page.locator('.step-nav button').last().click();
   const timerRows=page.locator('main .timer-row');
   await timerRows.nth(1).waitFor();
+  await timerRows.first().locator('.timer-menu summary').click();
   await timerRows.first().locator('[data-do="timer-edit"]').click();
   await page.locator('#timer-form input[name="seconds"]').fill('1');
   await page.locator('#timer-form button').click();

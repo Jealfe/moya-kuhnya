@@ -1,6 +1,6 @@
 import { isAndroid } from './native.js';
 import { plannedIds, activity, amount, duration, formatNumber, ordered, remaining, scaled, shoppingSections, statistics, totalTime } from './core.js';
-import { area, button, card, clock, dateLabel, empty, field, foodList, h, heading, icon, input, link, list, photo, ratingLabel, select, stat, statusFor, statusLabels } from './ui.js';
+import { actionMenu, area, button, card, clock, dateLabel, empty, field, foodList, h, heading, icon, input, link, list, photo, ratingLabel, select, stat, statusFor, statusLabels } from './ui.js';
 
 const start = recipe => button('Начать готовить','start',{id:recipe.id,kind:'primary start-cooking',symbol:'arrow'});
 const notes = entry => entry ? [['Получилось',entry.good],['Ошибки',entry.errors],['В следующий раз',entry.next]]
@@ -89,8 +89,9 @@ export function timerCard(timer, template) {
   const running=timer.end!==null && !expired;
   const untouched=template && !timer.saved;
   return '<div class="timer-row '+(expired?'expired':'')+'" data-timer="'+h(timer.id)+'"><div><strong>'+h(timer.name)+'</strong><small class="timer-state">'+(expired?'Время вышло':running?'Идёт':untouched?'Готов к запуску':'На паузе')+'</small></div>'+
-    '<span class="timer-clock">'+clock(left)+'</span><div class="actions">'+button(running?'Пауза':expired?'Повторить':'Запустить','timer-'+(running?'pause':'start'),{id:timer.id,kind:running?'':'primary'})+
-    button('Время','timer-edit',{id:timer.id})+button('Сброс','timer-reset',{id:timer.id,disabled:untouched})+'</div></div>';
+    '<span class="timer-clock">'+clock(left)+'</span><div class="timer-controls">'+button(running?'Пауза':expired?'Повторить':'Запустить','timer-'+(running?'pause':'start'),{id:timer.id,kind:running?'':'primary'})+
+    actionMenu('Действия таймера: '+timer.name,button('Изменить время','timer-edit',{id:timer.id,symbol:'time'})+
+      button('Сбросить таймер','timer-reset',{id:timer.id,disabled:untouched}),'timer-menu')+'</div></div>';
 }
 
 export function cookPage(state,reportDraft,ai=null) {
@@ -149,7 +150,8 @@ function shoppingGroups(items) {
   return [...groups].map(([group,entries])=>'<div class="shopping-category"><h3>'+h(group)+'</h3>'+entries.map(item=>
       '<div class="shopping-row '+(item.state!=='todo'?'checked':'')+'"><label><input type="checkbox" data-item="'+h(item.id)+'" '+(item.state==='bought'?'checked':'')+'><span><strong>'+h(item.name)+'</strong><small>'+h(amount(item))+(item.state==='home'?' · Уже дома':'')+'</small></span></label><div class="actions">'+
       button(item.state==='home'?'В покупки':'Есть дома','shop-home',{id:item.id,kind:item.state==='home'?'active':''})+
-      button('Изменить','shop-edit',{id:item.id,kind:'quiet'})+button('Удалить','shop-delete',{id:item.id,kind:'quiet danger'})+'</div></div>').join('')+'</div>').join('');
+      actionMenu('Действия с продуктом: '+item.name,button('Изменить','shop-edit',{id:item.id,symbol:'edit'})+
+        button('Удалить','shop-delete',{id:item.id,kind:'danger'}),'shopping-menu')+'</div></div>').join('')+'</div>').join('');
 }
 export function shoppingPage(state) {
   const sections=shoppingSections(state);
@@ -216,9 +218,9 @@ export function settingsPage(state,{section,offline,install,ai,timers,autoBackup
     case 'copies':
       content='<section class="panel padded form-stack"><h2>Резервная копия</h2>'+
         '<p>Сохраните данные в файл, чтобы восстановить их после переустановки или перенести на другое устройство.</p>'+
-        '<div class="actions">'+button('Скачать копию','backup',{symbol:'download',kind:'primary'})+
-        (isAndroid()?button('Поделиться копией','backup-share'):'')+
-        button('Восстановить из файла','restore',{symbol:'upload'})+'</div></section>'+autoBackup;
+        '<div class="settings-copy-actions">'+button('Скачать копию','backup',{symbol:'download',kind:'primary'})+
+        '<div class="entry-ai settings-action-list">'+button('Восстановить из файла','restore',{kind:'entry-ai-sub',symbol:'upload'})+
+        (isAndroid()?button('Поделиться копией','backup-share',{kind:'entry-ai-sub',symbol:'arrow'}):'')+'</div></div></section>'+autoBackup;
       break;
     default:
       content='<section class="panel padded form-stack"><h2>Оформление</h2>'+

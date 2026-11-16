@@ -627,3 +627,14 @@ html {background:var(--bg)}
 .entry-menu {margin-left:auto;flex:none}
 .entry-menu .recipe-add-actions {top:auto;bottom:calc(100% + 4px)}
 .entry-menu summary.btn {font-size:1.2rem}
+
+.timer-controls {display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.timer-controls>button,.shopping-row .actions>button {min-height:44px}
+.timer-menu .recipe-add-actions {position:static;min-width:0;box-shadow:none;margin-top:5px}
+.timer-controls:has(.timer-menu[open]) {flex-basis:100%;align-items:flex-start}
+.timer-menu[open] summary {margin-left:auto}
+.timer-menu .recipe-add-actions .btn {white-space:normal}
+.shopping-menu .recipe-add-actions {z-index:3}
+.settings-copy-actions {display:grid;gap:8px}
+.settings-action-list {margin-top:0}
+.settings-action-list .btn:first-child {border-top:0}

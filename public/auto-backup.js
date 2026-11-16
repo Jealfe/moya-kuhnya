@@ -1,6 +1,6 @@
 
 import { isAndroid, nativePlugin } from './native.js';
-import { button, h } from './ui.js';
+import { actionMenu, button, h } from './ui.js';
 
 export function createAutoBackup({getBackup,notice}) {
   let enabled=false, initialized=false, writing=null, pending=false, lastSaved=null, failed=false, delay;
@@ -79,8 +79,10 @@ export function createAutoBackup({getBackup,notice}) {
       return '<section class="panel padded form-stack"><h2>Автокопия дневника</h2>'+
         '<p>Выберите папку вне приложения. Приложение обновляет копию после изменений, включая дневник, рецепты, покупки, список продуктов и черновики. После переустановки выберите свежий файл в «Восстановить из файла».</p>'+
         '<p class="muted">'+(failed?'Последняя запись копии не удалась.':lastSaved?'Последняя копия: '+h(new Date(lastSaved).toLocaleString('ru-RU')):enabled?'Автокопия включена.':'Автокопия выключена.')+'</p>'+
-        '<div class="actions">'+button(enabled?'Сменить папку':'Выбрать папку','auto-backup-folder',{kind:'primary'})+
-        (enabled?button('Сохранить сейчас','auto-backup-now')+button('Отключить','auto-backup-off',{kind:'quiet'}):'')+'</div></section>';
+        '<div class="entry-footer">'+(enabled?button('Сохранить сейчас','auto-backup-now',{kind:'primary',symbol:'download'})+
+          actionMenu('Действия автокопии',button('Сменить папку','auto-backup-folder')+
+            button('Отключить','auto-backup-off',{kind:'danger'}),'entry-menu'):
+          button('Выбрать папку','auto-backup-folder',{kind:'primary'}))+'</div></section>';
     }
   };
 }

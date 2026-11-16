@@ -34,6 +34,9 @@ export const button = (label,action,{id='',kind='',symbol='',disabled=false}={})
   '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'" '+(disabled?'disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
 export const link = (label,route,{kind='',symbol=''}={}) =>
   '<a class="btn '+kind+'" href="#/'+route+'">'+(symbol?icon(symbol):'')+h(label)+'</a>';
+export const actionMenu = (label,actions,kind='') =>
+  '<details class="recipe-add-menu '+kind+'"><summary class="btn" aria-label="'+h(label)+'">⋯</summary>'+
+  '<div class="panel recipe-add-actions">'+actions+'</div></details>';
 export const options = (entries,selected) => entries.map(([value,label]) =>
   '<option value="'+h(value)+'"'+(String(selected)===String(value)?' selected':'')+'>'+h(label)+'</option>').join('');
 export const field = (label,body) => '<label class="field"><span>'+h(label)+'</span>'+body+'</label>';
