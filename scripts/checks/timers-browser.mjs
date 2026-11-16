@@ -35,7 +35,7 @@ try {
   await count(1);
   await page.locator('[data-do="cook-finish"]').click();
   await count(0);
-  await go('settings');
+  await go('settings/timers');
   await page.getByText('Уведомления таймеров включены.',{exact:true}).waitFor();
   console.log('PASS: independent Android timer notifications, pause, reset, finishing and permission status');
 } finally {await browser.close();}

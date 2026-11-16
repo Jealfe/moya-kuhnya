@@ -156,7 +156,12 @@ function render({focus=false}={}) {
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
     case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
-    case 'settings': main.innerHTML=settingsPage(state,isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',Boolean(installEvent),ai)+timerNotificationPanel()+autoBackup.panel(); break;
+    case 'settings':
+      main.innerHTML=settingsPage(state,{
+        section:id,offline:isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',
+        install:Boolean(installEvent),ai:ai.settings(),timers:timerNotificationPanel(),autoBackup:autoBackup.panel()
+      });
+      break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);

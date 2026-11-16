@@ -16,7 +16,7 @@ await context.addInitScript(()=>{
  },KitchenFiles:{save:async({content})=>{window.__backup=JSON.parse(content);return {saved:true};},share:async({content})=>{window.__shared=JSON.parse(content);}}}};
 });
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:4174/#/settings');await page.locator('#ai-settings').waitFor();
+await page.goto('http://127.0.0.1:4174/#/settings/ai');await page.locator('#ai-settings').waitFor();
 await page.locator('[name="gigachat-key"]').fill('dGVzdDpzZWNyZXQ=');await page.getByRole('button',{name:'Сохранить настройки',exact:true}).click();
 await page.waitForFunction(()=>window.__calls.save===1);await assert.equal(await page.locator('[name="gigachat-key"]').inputValue(),'');
 await page.locator('[data-do="ai-connect"]').click();await page.getByText('Подключение работает.',{exact:false}).waitFor();
@@ -44,7 +44,7 @@ await page.locator('[data-do="ai-done"]').first().click();await page.waitForFunc
 await page.goto('http://127.0.0.1:4174/#/history/pilaf');await page.locator('[data-do="ai-view"]').click();await page.locator('#dialog .ai-issue').waitFor();assert.equal(await page.evaluate(()=>window.__calls.analyze),1);
 await page.locator('#dialog [data-do="dialog-close"]').click();await page.evaluate(()=>window.__invalid=true);await page.locator('main [data-do="ai-repeat"]').click();await page.locator('#dialog').getByText('ИИ вернул невалидный JSON.',{exact:false}).waitFor();await page.locator('#dialog summary').filter({hasText:'Показать ответ ИИ'}).click();assert.equal(await page.locator('#dialog [name="ai-response"]').inputValue(),'broken-json');
 await page.locator('#dialog [data-do="dialog-close"]').click();await page.evaluate(()=>{window.__invalid=false;window.__slow=true;});await page.locator('main [data-do="ai-repeat"]').click();await page.locator('[data-do="ai-cancel"]').waitFor();await page.locator('[data-do="ai-cancel"]').click();await page.locator('#dialog').getByText('Запрос отменён.',{exact:true}).waitFor();
-await page.locator('#dialog [data-do="dialog-close"]').click();await page.goto('http://127.0.0.1:4174/#/settings');await page.locator('[data-do="backup"]').click();await page.waitForFunction(()=>!!window.__backup);
+await page.locator('#dialog [data-do="dialog-close"]').click();await page.goto('http://127.0.0.1:4174/#/settings/copies');await page.locator('[data-do="backup"]').click();await page.waitForFunction(()=>!!window.__backup);
 await page.getByText('Резервная копия сохранена',{exact:true}).waitFor();
 await page.getByRole('button',{name:'Поделиться копией',exact:true}).click();
 await page.waitForFunction(()=>!!window.__shared);

@@ -17,7 +17,7 @@ try {
       GigaChat:{status:async()=>({hasKey:false,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'})}
     }};
   });
-  await page.goto('http://127.0.0.1:4174/#/settings');
+  await page.goto('http://127.0.0.1:4174/#/settings/copies');
   await page.evaluate(async()=>{
     const {openStorage}=await import('/storage.js');
     const db=await openStorage();
@@ -35,13 +35,13 @@ try {
   await page.waitForFunction(()=>window.backupWrites.some(text=>text.includes('Отзыв для автокопии')));
   const json=await page.evaluate(()=>window.backupWrites.at(-1));
   assert.equal(JSON.parse(json).data.history.length,1);
-  await page.goto('http://127.0.0.1:4174/#/settings');
+  await page.goto('http://127.0.0.1:4174/#/settings/copies');
   await page.reload();
   await page.getByText(/Последняя копия:/).waitFor();
   await page.getByRole('button',{name:'Отключить',exact:true}).click();
   await page.getByRole('button',{name:'Выбрать папку',exact:true}).waitFor();
   const fresh=await browser.newPage();
-  await fresh.goto('http://127.0.0.1:4174/#/settings');
+  await fresh.goto('http://127.0.0.1:4174/#/settings/copies');
   await fresh.getByRole('button',{name:'Восстановить из файла'}).click();
   await fresh.locator('#dialog input[type=file]').setInputFiles({name:'auto.json',mimeType:'application/json',buffer:Buffer.from(json)});
   await fresh.getByRole('button',{name:'Проверить файл'}).click();

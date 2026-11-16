@@ -185,17 +185,38 @@ export function historyPage(state,recipeId,period,ai=null) {
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }
 
-export function settingsPage(state, offline, install,ai=null) {
-  return heading('Настройки','Оформление, таймеры и данные на этом устройстве.')+(ai?.settings()??'')+
-    '<div class="duo"><section class="panel padded form-stack"><h2>Приложение</h2>'+
-    field('Тема',select('theme',[['dark','Тёмная'],['light','Светлая']],state.settings.theme))+
-    '<label class="toggle"><input type="checkbox" name="sound" '+(state.settings.sound?'checked':'')+'> Звуковой сигнал таймеров</label>'+
-    '<label class="toggle"><input type="checkbox" name="wake" '+(state.settings.wake?'checked':'')+'> Не гасить экран во время готовки</label>'+
-    '<p class="muted">Доступность этой функции зависит от устройства и режима энергосбережения.</p></section>'+
-    '<section class="panel padded form-stack"><h2>Установка и офлайн</h2><p>'+h(offline)+'</p>'+
-    (isAndroid()?'':
-      install?button('Установить приложение','install',{kind:'primary'}):'<p class="muted">В Chrome на Android откройте меню ⋮ и выберите установку или добавление на главный экран.</p>')+
-    '<p class="muted">'+(isAndroid()?'Разрешения для фоновых сигналов находятся в разделе «Уведомления таймеров».':'После закрытия страницы используйте системный таймер телефона.')+'</p></section></div>'+
-    '<section class="panel padded form-stack"><h2>Резервная копия</h2><p>Сохраните рецепты, фото, покупки и дневник в файл. Копию можно восстановить после переустановки или открыть на другом устройстве.</p>'+
-    '<div class="actions">'+button('Скачать копию','backup',{symbol:'download',kind:'primary'})+(isAndroid()?button('Поделиться копией','backup-share'):'')+button('Восстановить из файла','restore',{symbol:'upload'})+'</div></section>';
+const settingsTabs=[['app','Приложение','settings'],['timers','Таймеры','time'],['ai','ИИ','spark'],['copies','Копии','download']];
+
+export function settingsPage(state,{section,offline,install,ai,timers,autoBackup}) {
+  const active=settingsTabs.find(([id])=>id===section)?.[0]??'app';
+  const tabs='<nav class="settings-tabs" aria-label="Разделы настроек">'+settingsTabs.map(([id,label,symbol])=>
+    '<a href="#/settings/'+id+'"'+(id===active?' aria-current="page"':'')+'>'+icon(symbol)+'<span>'+label+'</span></a>'
+  ).join('')+'</nav>';
+  let content;
+  switch(active) {
+    case 'timers':
+      content='<section class="panel padded form-stack"><h2>Готовка и таймеры</h2>'+
+        '<label class="toggle"><input type="checkbox" name="sound" '+(state.settings.sound?'checked':'')+'> Звуковой сигнал таймеров</label>'+
+        '<label class="toggle"><input type="checkbox" name="wake" '+(state.settings.wake?'checked':'')+'> Не гасить экран во время готовки</label>'+
+        '<p class="muted">Удержание экрана зависит от устройства и режима энергосбережения.</p>'+
+        (isAndroid()?'':'<p class="muted">После закрытия страницы используйте системный таймер телефона.</p>')+'</section>'+timers;
+      break;
+    case 'ai':
+      content=ai;
+      break;
+    case 'copies':
+      content='<section class="panel padded form-stack"><h2>Резервная копия</h2>'+
+        '<p>Сохраните данные в файл, чтобы восстановить их после переустановки или перенести на другое устройство.</p>'+
+        '<div class="actions">'+button('Скачать копию','backup',{symbol:'download',kind:'primary'})+
+        (isAndroid()?button('Поделиться копией','backup-share'):'')+
+        button('Восстановить из файла','restore',{symbol:'upload'})+'</div></section>'+autoBackup;
+      break;
+    default:
+      content='<section class="panel padded form-stack"><h2>Оформление</h2>'+
+        field('Тема',select('theme',[['dark','Тёмная'],['light','Светлая']],state.settings.theme))+'</section>'+
+        '<section class="panel padded form-stack"><h2>Установка и офлайн</h2><p>'+h(offline)+'</p>'+
+        (isAndroid()?'':install?button('Установить приложение','install',{kind:'primary'}):
+          '<p class="muted">В Chrome на Android откройте меню ⋮ и выберите установку или добавление на главный экран.</p>')+'</section>';
+  }
+  return heading('Настройки')+tabs+'<div class="settings-content">'+content+'</div>';
 }

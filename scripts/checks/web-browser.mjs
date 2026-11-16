@@ -13,7 +13,7 @@ await page.locator('.step-nav button').last().click();await page.locator('[data-
 await page.locator('[name="good"]').fill('Вкус хороший');await page.locator('[name="errors"]').fill('Мясо жёсткое');await page.locator('#report-form button[type="submit"],#report-form button:not([type])').first().click();
 await page.locator('.entry').waitFor();
 await page.reload();await page.locator('.entry').waitFor();
-await page.goto('http://127.0.0.1:4174/#/settings');const download=page.waitForEvent('download');await page.locator('[data-do="backup"]').click();await (await download).saveAs('work/browser/backup.json');
+await page.goto('http://127.0.0.1:4174/#/settings/copies');const download=page.waitForEvent('download');await page.locator('[data-do="backup"]').click();await (await download).saveAs('work/browser/backup.json');
 const registrations=await page.evaluate(async()=> (await navigator.serviceWorker.getRegistrations()).length);if(registrations!==1)throw Error('Web worker missing');
 const context=await browser.newContext();await context.addInitScript(()=>{window.Capacitor={getPlatform:()=> 'android'};});const native=await context.newPage();await native.goto('http://127.0.0.1:4174/');await native.locator('.brand').waitFor();if(await native.evaluate(async()=> (await navigator.serviceWorker.getRegistrations()).length))throw Error('Native worker registered');
 if(errors.length)throw Error(errors.join('\n'));console.log('PASS: routes, cooking, diary persistence, backup, web/native service worker');await browser.close();

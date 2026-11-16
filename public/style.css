@@ -525,3 +525,20 @@ html {background:var(--bg)}
     to {box-shadow:0 0 0 7px transparent}
   }
 }
+
+.settings-tabs {
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;
+  padding:5px;background:var(--soft);border:1px solid var(--line);border-radius:15px
+}
+.settings-tabs a {
+  display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;
+  border-radius:10px;color:var(--muted);font-size:.84rem;font-weight:650;text-align:center
+}
+.settings-tabs a[aria-current] {background:var(--chip);color:var(--olive);box-shadow:0 2px 8px #0002}
+.settings-content {display:grid;gap:14px}
+@media(max-width:420px) {
+  .settings-tabs a {flex-direction:column;gap:3px;font-size:.72rem;padding:4px 2px}
+}
+@media(prefers-reduced-motion:no-preference) {
+  .settings-content {animation:kitchen-rise .24s ease-out both}
+}
