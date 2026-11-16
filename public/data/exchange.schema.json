@@ -1395,7 +1395,8 @@
                 "theme": {
                   "enum": [
                     "dark",
-                    "light"
+                    "light",
+                    "atlas"
                   ]
                 },
                 "sound": {
@@ -2842,7 +2843,8 @@
                 "theme": {
                   "enum": [
                     "dark",
-                    "light"
+                    "light",
+                    "atlas"
                   ]
                 },
                 "sound": {

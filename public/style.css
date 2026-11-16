@@ -562,3 +562,46 @@ html {background:var(--bg)}
 .shopping-at-home .shopping-row label {opacity:.83}
 .shopping-at-home .shopping-category {margin-top:12px}
 [data-step-answer] {white-space:pre-wrap;overflow-wrap:anywhere}
+
+.step-ai-actions {display:flex;justify-content:flex-end}
+:root[data-theme=atlas] {
+  color-scheme:dark;
+  --bg:#0A0F11;--surface:#0F1619;--raised:#232E31;--line:#253337;
+  --ink:#EEECE5;--muted:#9DAAAF;--olive:#CFDCCF;--brand:#718F8A;--on-brand:#101C15;
+  --chip:#1D2B2A;--soft:#131C20;--danger:#FF8E86;
+  --atlas-outline:#475B5A;--atlas-lowest:#080C0F;--atlas-high:#162225;--atlas-highest:#1E2C2C;
+  --atlas-variant:#152125;--atlas-secondary:#718A88;--atlas-secondary-ink:#CFDDD2;
+  --shadow:0 18px 48px #0009;--lift:0 9px 26px #0006;--sheen:#718f8a12
+}
+[data-theme=atlas] #navigation,
+[data-theme=atlas][data-platform=android] #navigation {background:var(--surface)}
+[data-theme=atlas] .nav-inner a[aria-current],
+[data-theme=atlas] .settings-tabs a[aria-current] {
+  border:1px solid transparent;
+  background:linear-gradient(var(--chip),var(--chip)) padding-box,
+    linear-gradient(#718f8a00,#718f8a40,#718f8acc) border-box
+}
+[data-theme=atlas] .nav-inner a[aria-current]::after {background:var(--brand)}
+[data-theme=atlas] .hero {background:var(--atlas-lowest);border-color:var(--atlas-outline)}
+[data-theme=atlas] .hero-copy {
+  background:linear-gradient(135deg,#1d2b2ae6 0%,#1d2b2ae0 30%,#1d2b2aad 58%,#1d2b2a47 83%,transparent),
+    var(--atlas-high);
+}
+[data-theme=atlas] .hero-copy .kicker,
+[data-theme=atlas] .hero-copy p {color:var(--atlas-secondary-ink)}
+[data-theme=atlas] .hero-copy .btn.ghost {--ink:#EEECE5;--raised:#232E31;border-color:var(--atlas-outline)}
+[data-theme=atlas] .hero-caption {border-image:linear-gradient(90deg,transparent,#718f8a60,#718f8a25,transparent) 1}
+[data-theme=atlas] .hero-caption strong,[data-theme=atlas] .recipe-card h3 {color:#fff}
+[data-theme=atlas] .hero-caption small {background:#080c0fcc;color:var(--ink)}
+[data-theme=atlas] input:not([type=checkbox],[type=radio]),
+[data-theme=atlas] select,[data-theme=atlas] textarea,[data-theme=atlas] .select-trigger {
+  background:var(--surface);border-color:var(--atlas-outline)
+}
+[data-theme=atlas] .filter-panel .search input {border:0}
+[data-theme=atlas] .step-ai-button,[data-theme=atlas] .ai-step {background:var(--atlas-highest);border-color:var(--brand)}
+[data-theme=atlas] [data-step-answer]:not(:empty) {padding:10px 12px;border-radius:10px;background:var(--atlas-variant);color:var(--ink)}
+[data-theme=atlas] .rating label:has(input:checked),
+[data-theme=atlas] .rating label:has(~ label input:checked),
+[data-theme=atlas] .stat-icon {color:#FFB300}
+[data-theme=atlas] .stat strong {color:#D6BB78}
+[data-theme=atlas] .favorite.selected {color:var(--atlas-secondary)}

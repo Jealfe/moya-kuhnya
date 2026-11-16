@@ -115,7 +115,7 @@ export function cookPage(state,reportDraft,ai=null) {
     '<div class="cook-layout"><section class="panel cook-step padded"><div class="kicker">Шаг '+(index+1)+' из '+recipe.steps.length+'</div><h2>'+h(step.title)+'</h2>'+(ai?.stepAdvice(recipe.id,index)??'')+'<p class="instruction">'+h(step.instruction)+'</p>'+
     (step.temperature?'<div class="info">'+h(step.temperature)+'</div>':'')+(step.ready?'<div class="note"><strong>Как понять, что готово</strong><p>'+h(step.ready)+'</p></div>':'')+
     (step.parallel?'<div class="note"><strong>Параллельно</strong><p>'+h(step.parallel)+'</p></div>':'')+
-    (ai?.questionButton()??'')+(timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
+    (ai?.questionButton()?'<div class="step-ai-actions">'+ai.questionButton()+'</div>':'')+(timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+
     (notes(previous)?'<h3>Из прошлой попытки</h3>'+notes(previous):'')+'</aside></div>'+
     '<div class="actions cook-actions">'+button('Назад','cook-step',{id:index-1,disabled:index===0,symbol:'back'})+
@@ -218,7 +218,7 @@ export function settingsPage(state,{section,offline,install,ai,timers,autoBackup
       break;
     default:
       content='<section class="panel padded form-stack"><h2>Оформление</h2>'+
-        field('Тема',select('theme',[['dark','Тёмная'],['light','Светлая']],state.settings.theme))+'</section>'+
+        field('Тема',select('theme',[['dark','Тёмная'],['light','Светлая'],['atlas','Атлас']],state.settings.theme))+'</section>'+
         '<section class="panel padded form-stack"><h2>Установка и офлайн</h2><p>'+h(offline)+'</p>'+
         (isAndroid()?'':install?button('Установить приложение','install',{kind:'primary'}):
           '<p class="muted">В Chrome на Android откройте меню ⋮ и выберите установку или добавление на главный экран.</p>')+'</section>';

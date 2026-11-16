@@ -25,9 +25,14 @@ class KitchenDevicePlugin : Plugin() {
     @PluginMethod
     fun setTheme(call: PluginCall) {
         val light = call.getBoolean("light", false) == true
+        val background = when {
+            call.getString("theme") == "atlas" -> "#0A0F11"
+            light -> "#f4f4eb"
+            else -> "#161e18"
+        }
         activity.runOnUiThread {
             val window = activity.window
-            window.decorView.setBackgroundColor(Color.parseColor(if (light) "#f4f4eb" else "#161e18"))
+            window.decorView.setBackgroundColor(Color.parseColor(background))
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.isAppearanceLightStatusBars = light
             controller.isAppearanceLightNavigationBars = light

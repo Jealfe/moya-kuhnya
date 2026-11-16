@@ -116,7 +116,7 @@ async function changeSession(mutate,options) {
 
 function syncSystemBars() {
   const device=globalThis.Capacitor?.Plugins?.KitchenDevice;
-  if (isAndroid() && device) void device.setTheme({light:state.settings.theme==='light'}).catch(()=>{});
+  if (isAndroid() && device) void device.setTheme({theme:state.settings.theme,light:state.settings.theme==='light'}).catch(()=>{});
 }
 function render({focus=false}={}) {
   if (!state) return;
@@ -124,7 +124,7 @@ function render({focus=false}={}) {
   const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
   if (document.documentElement.dataset.theme!==state.settings.theme) syncSystemBars();
   document.documentElement.dataset.theme=state.settings.theme;
-  document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#161e18':'#f4f4eb';
+  document.querySelector('meta[name="theme-color"]').content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   const recipes=catalogItems();
   const recipe=id?findRecipe(id):null;
   header.innerHTML='<div class="header-inner"><a class="brand" href="#/home">'+icon('logo')+'<span>Моя кухня</span></a><div class="header-right">'+
