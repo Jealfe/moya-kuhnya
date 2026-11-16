@@ -115,6 +115,8 @@ export function parseBackup(value,schema,legacySchema) {
   return {...data,aiAnalyses:data.aiAnalyses??[]};
 }
 
+export const plannedIds = state => Array.isArray(state.planned)?state.planned:state.planned?[state.planned]:[];
+
 export const scaled = (ingredients, servings, original) =>
   ingredients.map(item => ({...item,quantity:item.quantity*servings/original}));
 

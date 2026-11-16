@@ -77,6 +77,11 @@ class GigaChatPlugin : Plugin() {
         val models = client.models()
         statusObject().put("models", JSArray(models)).put("connected", true)
     }
+    @PluginMethod fun explainStep(call: PluginCall) = execute(call) {
+        val payload = call.getObject("payload") ?: throw GigaFailure("Не передан шаг готовки.")
+        if (payload.toString().length > 20_000) throw GigaFailure("Вопрос или шаг слишком длинный.")
+        JSObject().put("content", client.explainStep(payload, model))
+    }
     @PluginMethod fun analyze(call: PluginCall) = execute(call) {
         val payload = call.getObject("payload") ?: throw GigaFailure("Не переданы данные отзыва.")
         if (payload.toString().length > 50_000) throw GigaFailure("Данные анализа слишком велики.")

@@ -1,6 +1,6 @@
 import { isAndroid, nativePlugin } from './native.js';
 import { advicePlan, adviceForStep, analysisStale, createAnalysis, currentAdvice, latestAnalysis, recipeForEntry, reviewData, fingerprint, storeAnalysis } from './ai.js';
-import { button, dateLabel, field, h, input, list, select } from './ui.js';
+import { button, dateLabel, field, h, input, list, select, area } from './ui.js';
 
 export function createAi({getState,findRecipe,change,render,showDialog,showError}) {
   let status={hasKey:false,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'},connectionStatus='Подключение ещё не проверено.',models=[];
@@ -99,7 +99,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     if (!entry) throw Error('Сначала сохраните отзыв.');
     if (!repeat && latestAnalysis(state,entryId)) {await showResult(entryId);return;}
     if (!isAndroid()) throw Error('Анализ доступен в Android-приложении.');
-    if (!status.hasKey) {location.hash='/settings';throw Error('Сохраните ключ GigaChat в настройках.');}
+    if (!status.hasKey) {location.hash='/settings/ai';throw Error('Сохраните ключ GigaChat в настройках.');}
     const recipe=recipeForEntry(entry,findRecipe(entry.recipeId));
     if (!recipe) throw Error('Рецепт больше не доступен.');
     document.querySelector('#dialog')?.close();
@@ -132,6 +132,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
   }
   async function action(action,id) {
     switch(action) {
+      case 'ai-step-question': return openQuestion();
       case 'ai-view': return showResult(id);
       case 'ai-analyze': return analyze(id);
       case 'ai-repeat': return analyze(id,true);
@@ -168,5 +169,37 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       }
     }
   }
-  return {initialize,refreshAdvice,settings,entryControls,beforeCooking,stepAdvice,action,save:form=>save(form).catch(showError)};
+  function questionButton() {
+    return isAndroid()?button('Спросить ИИ','ai-step-question',{symbol:'spark'}):'';
+  }
+  function openQuestion() {
+    const session=getState().session;
+    const step=session?.recipe.steps[session.step];
+    if (!step) return;
+    if (!status.hasKey) {location.hash='/settings/ai';throw Error('Сохраните ключ GigaChat в настройках.');}
+    showDialog('Помощь с шагом','<form id="ai-step-form" class="form-stack">'+
+      '<p>'+h(step.title)+'</p>'+field('Что непонятно?',area('question','','rows="3" maxlength="1200" placeholder="Например, как понять, что лук готов?"'))+
+      '<button class="btn primary" type="submit">Спросить</button><p class="muted" role="status" data-step-answer></p></form>');
+  }
+  async function askStep(form) {
+    const session=getState().session;
+    const step=session?.recipe.steps[session.step];
+    if (!step) return;
+    const control=form.querySelector('[type=submit]');
+    if (control.disabled) return;
+    const answer=form.querySelector('[data-step-answer]');
+    control.disabled=true;
+    answer.textContent='ИИ готовит пояснение…';
+    try {
+      const reply=await native().explainStep({payload:{
+        recipe:session.recipe.name,servings:session.servings,
+        step:{title:step.title,instruction:step.instruction,temperature:step.temperature,ready:step.ready,parallel:step.parallel},
+        question:form.elements.question.value.trim()||'Объясни этот шаг проще и подробнее.'
+      }});
+      answer.textContent=reply.content;
+    } catch(error) {
+      answer.textContent=error.message||'Не удалось получить ответ. Повторите запрос.';
+    } finally {control.disabled=false;}
+  }
+  return {initialize,refreshAdvice,settings,entryControls,beforeCooking,stepAdvice,questionButton,askStep,action,save:form=>save(form).catch(showError)};
 }

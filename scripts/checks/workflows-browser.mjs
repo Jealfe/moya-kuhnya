@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+
+const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,headless:true,args:['--no-sandbox']});
+try {
+  const page=await browser.newPage({viewport:{width:360,height:780},isMobile:true,hasTouch:true});
+  await page.addInitScript(()=>{
+    window.Capacitor={getPlatform:()=> 'android',Plugins:{GigaChat:{
+      status:async()=>({hasKey:true,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'}),
+      explainStep:async({payload})=>{
+        window.stepQuestion=payload;
+        return {content:'Нарежьте овощи одинаковыми кусочками.'};
+      }
+    }}};
+  });
+  const go=route=>page.goto('http://127.0.0.1:4174/#/'+route);
+  const action=name=>page.locator('[data-do="'+name+'"]');
+  await go('recipes');
+  const search=page.getByRole('searchbox');
+  await search.fill('плов');
+  await page.getByLabel('Избранное',{exact:true}).check();
+  await action('reset-filters').click();
+  assert.equal(await search.inputValue(),'');
+  assert.equal(await page.getByLabel('Избранное',{exact:true}).isChecked(),false);
+  await go('recipe/pilaf');
+  await action('plan').click();
+  await page.getByText('Добавлено в план',{exact:true}).waitFor();
+  await go('recipe/syrniki');
+  await action('plan').click();
+  await page.getByRole('button',{name:'Убрать из плана',exact:true}).waitFor();
+  await go('home');
+  assert.equal(await page.locator('.cooking-plan li').count(),2);
+  await go('recipe/pilaf');
+  await action('recipe-shop').click();
+  await page.getByText('Блюдо добавлено отдельным списком',{exact:true}).waitFor();
+  await go('shopping');
+  const first=page.locator('.shopping-group .shopping-row').first();
+  const product=await first.locator('strong').textContent();
+  await first.getByRole('button',{name:'Есть дома',exact:true}).click();
+  await page.locator('.shopping-at-home').getByText(product,{exact:true}).waitFor();
+  assert.equal(await page.locator('.shopping-group .shopping-row').getByText(product,{exact:true}).count(),0);
+  await go('recipe/pilaf');
+  await action('start').click();
+  await action('ai-step-question').click();
+  await page.getByLabel('Что непонятно?').fill('Как нарезать?');
+  await page.getByRole('button',{name:'Спросить',exact:true}).click();
+  await page.getByText('Нарежьте овощи одинаковыми кусочками.',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.stepQuestion.question),'Как нарезать?');
+  await action('dialog-close').click();
+  await page.locator('.step-nav button').last().click();
+  await action('cook-finish').click();
+  await page.getByRole('link',{name:'Оценить позже',exact:true}).click();
+  await page.locator('.entry').getByRole('link',{name:'Оценить',exact:true}).click();
+  const note=page.getByLabel('Что получилось хорошо');
+  await note.fill('Первая заметка');
+  await page.getByRole('button',{name:'Сохранить впечатления'}).click();
+  await page.getByRole('link',{name:'Редактировать отзыв',exact:true}).click();
+  assert.equal(await note.inputValue(),'Первая заметка');
+  await note.fill('Заметка исправлена');
+  await page.getByRole('button',{name:'Сохранить впечатления'}).click();
+  await page.getByText('Заметка исправлена',{exact:true}).waitFor();
+  assert.equal(await page.locator('.entry').count(),1);
+  await page.locator('.history-recipe-link').click();
+  await page.waitForURL('**/#/recipe/pilaf');
+  await go('home');
+  assert.equal(await page.locator('.cooking-plan li').count(),1);
+  console.log('PASS: reset filters, multiple planned recipes, home shopping, GigaChat step question, deferred and edited review.');
+} finally {await browser.close();}

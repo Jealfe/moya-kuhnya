@@ -3,7 +3,7 @@ import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
 import { makeBackup, readBackup } from './backup.js';
 import { createAutoBackup } from './auto-backup.js';
-import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { plannedIds, addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
@@ -21,7 +21,8 @@ const pantryDialog=document.querySelector('#pantry-dialog');
 const notice=document.querySelector('#notice');
 const routes=[['home','Главная'],['recipes','Рецепты'],['shopping','Покупки'],['history','История'],['settings','Настройки']];
 const recipeBase='./data/recipes/';
-const filters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
+const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
+const filters={...defaultFilters};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
 let pantry, drafts, deletedBatch=null, checkingGitHub=false;
@@ -150,12 +151,12 @@ function render({focus=false}={}) {
       break;
     case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id],ai); break;
     case 'impression': {
-      const entry=state.history.find(item=>item.id===id && item.pending);
+      const entry=state.history.find(item=>item.id===id);
       main.innerHTML=entry?reportPage(entry,drafts['report/'+id]):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
       break;
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
-    case 'history': main.innerHTML=historyPage(state,id,period,ai); break;
+    case 'history': main.innerHTML=historyPage(state,id,period,ai,findRecipe); break;
     case 'settings':
       main.innerHTML=settingsPage(state,{
         section:id,offline:isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',
@@ -382,7 +383,7 @@ async function finishCooking(pending=true,report={}) {
     if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
     current.history.push(entry);
     updateAutomaticStatus(current,entry.recipeId);
-    if (current.planned===entry.recipeId) current.planned=null;
+    current.planned=plannedIds(current).filter(id=>id!==entry.recipeId);
     current.session=null;
   },{backup:true});
   return entry;
@@ -475,7 +476,21 @@ async function onAction(action,id) {
         return;
       }
       break;
-    case 'plan': await change(current=>{current.planned=current.planned===id?null:id;}); say(state.planned?'Добавлено в план':'Убрано из плана'); break;
+    case 'reset-filters':
+      Object.assign(filters,defaultFilters);
+      render();
+      main.querySelector('#filters input[name="query"]').focus();
+      return;
+    case 'plan': {
+      let added;
+      await change(current=>{
+        const ids=plannedIds(current);
+        added=!ids.includes(id);
+        current.planned=added?[...ids,id]:ids.filter(item=>item!==id);
+      });
+      say(added?'Добавлено в план':'Убрано из плана');
+      break;
+    }
     case 'recipe-shop':
       if (!validPortions(id)) return;
       await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
@@ -723,6 +738,7 @@ document.addEventListener('submit',event=>{
   if (event.defaultPrevented) return;
   event.preventDefault();
   const form=event.target;
+  if (form.id==='ai-step-form') {void ai.askStep(form);return;}
   if (form.id==='ai-settings') {void ai.save(form);return;}
   const data=new FormData(form);
   void run(async()=>{
@@ -826,8 +842,8 @@ document.addEventListener('submit',event=>{
           const entry=await finishCooking(false,{...report,image});
           recipeId=entry.recipeId;
         } else await change(current=>{
-          const entry=current.history.find(item=>item.id===id && item.pending);
-          if (!entry) throw Error('Эта запись уже сохранена или удалена.');
+          const entry=current.history.find(item=>item.id===id);
+          if (!entry) throw Error('Эта запись уже удалена.');
           Object.assign(entry,report);
           if (image) entry.image=image;
           delete entry.pending;

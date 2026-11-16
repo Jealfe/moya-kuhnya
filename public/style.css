@@ -542,3 +542,12 @@ html {background:var(--bg)}
 @media(prefers-reduced-motion:no-preference) {
   .settings-content {animation:kitchen-rise .24s ease-out both}
 }
+
+.cooking-plan {padding:0;margin:10px 0 0;list-style:none}
+.cooking-plan li {display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line)}
+.cooking-plan a,.history-recipe-link {color:var(--olive);text-decoration:underline;text-underline-offset:4px}
+.cooking-plan a {padding:10px 0;overflow-wrap:anywhere}
+.shopping-at-home {background:var(--bg)}
+.shopping-at-home .shopping-row label {opacity:.83}
+.shopping-at-home .shopping-category {margin-top:12px}
+[data-step-answer] {white-space:pre-wrap;overflow-wrap:anywhere}

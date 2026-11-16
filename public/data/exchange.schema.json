@@ -597,6 +597,12 @@
             "planned": {
               "anyOf": [
                 {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "uniqueItems": true,
+                  "items": {"type":"string","minLength":1,"maxLength":80,"pattern":"^[a-z0-9][a-z0-9_-]*$"}
+                },
+                {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 80,
@@ -2040,6 +2046,12 @@
             },
             "planned": {
               "anyOf": [
+                {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "uniqueItems": true,
+                  "items": {"type":"string","minLength":1,"maxLength":80,"pattern":"^[a-z0-9][a-z0-9_-]*$"}
+                },
                 {
                   "type": "string",
                   "minLength": 1,
