@@ -170,7 +170,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     }
   }
   function questionButton() {
-    return isAndroid()?button('Спросить ИИ','ai-step-question',{symbol:'spark'}):'';
+    return isAndroid()?button('Спросить ИИ','ai-step-question',{symbol:'spark',kind:'step-ai-button'}):'';
   }
   function openQuestion() {
     const session=getState().session;

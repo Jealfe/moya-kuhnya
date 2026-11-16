@@ -21,7 +21,7 @@ export function home(state, recipes, featured) {
     '<section><div class="section-heading"><h2>Ваш прогресс</h2><a href="#/history">В дневник '+icon('arrow')+'</a></div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
     '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
     '<div class="panel mini"><div class="kicker">План готовки</div>'+(planned.length?'<ul class="cooking-plan">'+planned.map(recipe=>'<li>'+
-      '<a href="#/recipe/'+h(recipe.id)+'">'+h(recipe.name)+'</a>'+button('Убрать','plan',{id:recipe.id,kind:'quiet'})+'</li>').join('')+'</ul>':'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
+      '<a href="#/recipe/'+h(recipe.id)+'">'+h(recipe.name)+'<small>'+h(recipe.category)+'</small></a>'+button('Убрать','plan',{id:recipe.id,kind:'quiet'})+'</li>').join('')+'</ul>':'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
     '<section><div class="section-heading"><h2>Из каталога</h2><a href="#/recipes">Все рецепты '+icon('arrow')+'</a></div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
 }
 

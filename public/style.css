@@ -547,6 +547,17 @@ html {background:var(--bg)}
 .cooking-plan li {display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line)}
 .cooking-plan a,.history-recipe-link {color:var(--olive);text-decoration:underline;text-underline-offset:4px}
 .cooking-plan a {padding:10px 0;overflow-wrap:anywhere}
+.cooking-plan a small {display:block;margin-top:3px;color:var(--muted);font-weight:500}
+.btn.step-ai-button {
+  min-height:48px;margin-top:8px;background:var(--chip);color:var(--ink);
+  border-color:var(--olive);box-shadow:0 2px 10px color-mix(in srgb,var(--olive) 16%,transparent)
+}
+.btn.step-ai-button:hover:not(:disabled) {background:var(--raised)}
+.step-ai-button .icon {color:var(--olive)}
+@media(prefers-reduced-motion:no-preference) {
+  .step-ai-button .icon {animation:step-ai-sparkle .55s .15s ease-out both}
+  @keyframes step-ai-sparkle {0% {transform:scale(.7)} 55% {transform:scale(1.22) rotate(10deg)}}
+}
 .shopping-at-home {background:var(--bg)}
 .shopping-at-home .shopping-row label {opacity:.83}
 .shopping-at-home .shopping-category {margin-top:12px}

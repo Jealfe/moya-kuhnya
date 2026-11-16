@@ -183,12 +183,22 @@ function onRoute() {
   if (mode) pantry.show(mode,catalogItems());
   else if (wasOpen && page==='recipes') main.querySelector('.catalog-options a').focus();
 }
+function chooseFeatured(previous) {
+  const recipes=catalogItems();
+  const choices=recipes.filter(recipe=>recipe.id!==previous);
+  const selected=choices[Math.floor(Math.random()*choices.length)]??recipes[0];
+  featuredId=selected?.id;
+  if (featuredId) {
+    try {localStorage.setItem('last-featured-recipe',featuredId);} catch {}
+  }
+}
 function nextCountdown(timers,now=Date.now()) {
   return Math.min(...timers.filter(timer=>timer.end!==null && remaining(timer,now)>0).map(timer=>remaining(timer,now)));
 }
 function renderDock(force=false) {
-  const timers=state.session?.timers.filter(timer=>timer.end!==null || timer.remaining!==timer.duration) ?? [];
-  const signature=timers.map(timer=>timer.id+'-'+(timer.end===null?'p':remaining(timer)>0?'r':'x')).join(',');
+  const now=Date.now();
+  const timers=state.session?.timers.filter(timer=>timer.end===null?timer.remaining!==timer.duration:timer.end>now) ?? [];
+  const signature=timers.map(timer=>timer.id+'-'+(timer.end===null?'p':'r')).join(',');
   if (!force && signature===timerSignature) return;
   timerSignature=signature;
   const focused=document.activeElement;
@@ -196,10 +206,9 @@ function renderDock(force=false) {
   const open=details?.open || false;
   dock.hidden=!timers.length;
   if (!timers.length) { dock.innerHTML=''; return; }
-  const next=nextCountdown(timers);
-  const expired=timers.filter(timer=>timer.end!==null && remaining(timer)===0).length;
+  const next=nextCountdown(timers,now);
   dock.innerHTML='<details '+(open?'open':'')+'><summary>'+icon('time')+' Таймеры <strong>'+timers.length+'</strong>'+
-    (expired?' <span class="overdue">Готово: '+expired+'</span>':'')+(Number.isFinite(next)?' <strong class="dock-clock" aria-label="Ближайший таймер">'+clock(next)+'</strong>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
+    (Number.isFinite(next)?' <strong class="dock-clock" aria-label="Ближайший таймер">'+clock(next)+'</strong>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
   if (focused?.dataset.do && details?.contains(focused)) {
     [...dock.querySelectorAll('[data-do]')].find(el=>el.dataset.do===focused.dataset.do && el.dataset.id===focused.dataset.id)?.focus();
   }
@@ -464,8 +473,7 @@ async function onAction(action,id) {
     case 'start': if (validPortions(id)) await startCooking(id); return;
     case 'start-replace': await startCooking(id,true); return;
     case 'random': {
-      const choices=catalogItems().filter(recipe=>recipe.id!==featuredId);
-      featuredId=choices[Math.floor(Math.random()*choices.length)]?.id ?? featuredId;
+      chooseFeatured(featuredId);
       break;
     }
     case 'favorite':
@@ -920,7 +928,9 @@ try {
   ]);
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
   pantry=createPantry(pantryDialog,storage,savedPantry,()=>autoBackup.schedule());
-  featuredId='pilaf';
+  let lastFeatured;
+  try {lastFeatured=localStorage.getItem('last-featured-recipe');} catch {}
+  chooseFeatured(lastFeatured);
   await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
   await syncTimerNotifications();
   syncSystemBars();

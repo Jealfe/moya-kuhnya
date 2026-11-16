@@ -15,6 +15,12 @@ try {
   });
   const go=route=>page.goto('http://127.0.0.1:4174/#/'+route);
   const action=name=>page.locator('[data-do="'+name+'"]');
+  await go('home');
+  const featured=page.locator('.hero-art');
+  const firstFeatured=await featured.getAttribute('href');
+  assert.ok(firstFeatured?.startsWith('#/recipe/'));
+  await page.reload();
+  assert.notEqual(await featured.getAttribute('href'),firstFeatured);
   await go('recipes');
   const search=page.getByRole('searchbox');
   await search.fill('плов');
@@ -30,6 +36,7 @@ try {
   await page.getByRole('button',{name:'Убрать из плана',exact:true}).waitFor();
   await go('home');
   assert.equal(await page.locator('.cooking-plan li').count(),2);
+  assert.equal(await page.locator('.cooking-plan a small').count(),2);
   await go('recipe/pilaf');
   await action('recipe-shop').click();
   await page.getByText('Блюдо добавлено отдельным списком',{exact:true}).waitFor();
@@ -41,6 +48,7 @@ try {
   assert.equal(await page.locator('.shopping-group .shopping-row').getByText(product,{exact:true}).count(),0);
   await go('recipe/pilaf');
   await action('start').click();
+  await page.locator('.step-ai-button').waitFor();
   await action('ai-step-question').click();
   await page.getByLabel('Что непонятно?').fill('Как нарезать?');
   await page.getByRole('button',{name:'Спросить',exact:true}).click();
@@ -48,6 +56,16 @@ try {
   assert.equal(await page.evaluate(()=>window.stepQuestion.question),'Как нарезать?');
   await action('dialog-close').click();
   await page.locator('.step-nav button').last().click();
+  const timerRows=page.locator('main .timer-row');
+  await timerRows.nth(1).waitFor();
+  await timerRows.first().locator('[data-do="timer-edit"]').click();
+  await page.locator('#timer-form input[name="seconds"]').fill('1');
+  await page.locator('#timer-form button').click();
+  await timerRows.first().locator('[data-do="timer-start"]').click();
+  await page.locator('#timer-dock:not([hidden])').waitFor();
+  await timerRows.first().getByText('Время вышло',{exact:true}).waitFor();
+  await page.locator('#timer-dock').waitFor({state:'hidden'});
+  await timerRows.first().getByRole('button',{name:'Повторить',exact:true}).waitFor();
   await action('cook-finish').click();
   await page.getByRole('link',{name:'Оценить позже',exact:true}).click();
   await page.locator('.entry').getByRole('link',{name:'Оценить',exact:true}).click();
