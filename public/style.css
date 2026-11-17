@@ -95,12 +95,12 @@ main:focus {outline:none}
 .mini h3 {margin-top:8px}
 .mini p {color:var(--muted)}
 .cards {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.recipe-card {position:relative;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.recipe-card {position:relative;display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .recipe-card:hover {border-color:var(--olive)}
 .recipe-card h3 {margin:.42rem 0 .7rem}
 .recipe-card h3 a::after {content:"";position:absolute;inset:0}
 .recipe-card:focus-within {outline:2px solid var(--brand);outline-offset:2px}
-.card-content {padding:16px 17px 19px}
+.card-content {display:flex;flex:1;flex-direction:column;padding:16px 17px 19px}
 .card-meta {color:var(--muted);font-size:.83rem;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .favorite {position:absolute;top:10px;right:10px;z-index:1;background:#181a15df;color:#f5efe1;border:1px solid #fff2;border-radius:50%;width:44px;height:44px;display:grid;place-items:center}
 .favorite.selected {color:#f1a87d}
@@ -132,6 +132,7 @@ main:focus {outline:none}
 .recipe-add-actions .btn {justify-content:flex-start;white-space:nowrap}
 .filter-selects {display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .filter-selects .field {flex:1 1 110px}
+.filter-selects [data-do="reset-filters"] {margin-left:auto}
 .search {display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;padding-left:12px;color:var(--olive);background:var(--bg)}
 .search input[type=search] {border:none;background:none}
 #recipe-count {color:var(--muted);margin:0}
@@ -445,7 +446,7 @@ html {background:var(--bg)}
 .filter-panel .search {background:var(--surface);border-radius:14px}
 .catalog-options .btn {background:var(--chip);color:var(--olive);border-color:transparent}
 .recipe-card .photo::after {content:"";position:absolute;inset:auto 0 0;height:25%;background:linear-gradient(transparent,#10211744);pointer-events:none}
-.recipe-card .card-meta {border-top:1px solid var(--line);padding-top:8px}
+.recipe-card .card-meta {margin-top:auto;border-top:1px solid var(--line);padding-top:8px}
 .recipe-card .kicker {font-size:.66rem;letter-spacing:.08em}
 .detail-copy .pills {gap:6px}
 .recipe-cover .favorite {box-shadow:0 3px 14px #0a170c60}

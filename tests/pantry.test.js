@@ -73,3 +73,23 @@ test('основы доступны по умолчанию и не создаю
   assert.deepEqual(matches[1].missing,['Сливочное масло','Оливковое масло']);
   assert.deepEqual(matchRecipes(dishes,['картошка'],{useBasics:false})[1].missing,['Соль','Вода','Растительное масло']);
 });
+
+test('общие названия из ручного ввода находят разновидности продуктов без ложных совпадений',()=>{
+  const dishes=[
+    recipe('Тесто',['Мука пшеничная']),
+    recipe('Блины',['Рисовая мука']),
+    recipe('Макароны с сыром',['Макароны перья']),
+    recipe('Томатный соус',['Томатная паста']),
+    recipe('Пюре',['Картофель молодой'])
+  ];
+  const names=productCatalog(dishes);
+  const entered=updateProducts([],splitProducts('мука, макароны, картошка',names),names);
+  assert.deepEqual(entered,['Мука','Макароны','Картофель молодой']);
+  const result=new Map(matchRecipes(dishes,entered).map(match=>[match.recipe.name,match]));
+  assert.deepEqual(result.get('Тесто').check,['Мука пшеничная']);
+  assert.deepEqual(result.get('Блины').check,['Рисовая мука']);
+  assert.deepEqual(result.get('Макароны с сыром').check,['Макароны перья']);
+  assert.deepEqual(result.get('Пюре').available,['Картофель молодой']);
+  assert.equal(result.has('Томатный соус'),false);
+  assert.deepEqual(matchRecipes(dishes,['рисовая мука']).map(match=>match.recipe.name),['Блины']);
+});
