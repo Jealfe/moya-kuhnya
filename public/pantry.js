@@ -10,7 +10,7 @@ const normalize = name => name.normalize('NFKC').toLocaleLowerCase('ru')
 const variants = [
   ['Яйцо','Яйца','Куриное яйцо','Куриные яйца'],
   ['Картофель','Картошка','Некрупный картофель','Картофель некрупный','Молодой картофель','Картофель молодой'],
-  ['Репчатый лук','Лук репчатый','Луковица','Лук'],
+  ['Репчатый лук','Лук репчатый','Луковица'],
   ['Красный лук','Лук красный'],
   ['Зелёный лук','Лук зелёный'],
   ['Белокочанная капуста','Капуста белокочанная','Капуста белая'],
@@ -73,6 +73,8 @@ const productFamilies = new Map([
 const defaultProducts = new Set(quickProducts.map(productKey));
 const basicProducts = new Set([...defaultProducts,'подсолнечное рафинированное масло']);
 
+const wholeWords = name => ' '+name.replace(/[^\p{L}\p{N}]+/gu,' ').trim()+' ';
+
 export function productCatalog(recipes) {
   const names = new Map();
   const families=[...productFamilies.keys()].map(key=>key[0].toLocaleUpperCase('ru')+key.slice(1));
@@ -124,11 +126,27 @@ export function updateProducts(products,candidates,catalog) {
 export function matchRecipes(recipes,products,{useBasics=true}={}) {
   const selected=new Set(products.map(productKey));
   if (!selected.size) return [];
+  const wordsByKey=new Map();
+  const wordsFor=key=>{
+    if (!wordsByKey.has(key)) wordsByKey.set(key,wholeWords(key));
+    return wordsByKey.get(key);
+  };
+  const isVarietyOf=(specific,general)=>{
+    if (specific===general) return false;
+    const specificWords=wordsFor(specific);
+    const phrase=wordsFor(general);
+    if (phrase.length>=5 && specificWords!==phrase && specificWords.includes(phrase)) return true;
+    return productFamilies.get(general)?.some(variant=>specificWords.includes(wordsFor(variant)))??false;
+  };
+  const selectedKeys=[...selected];
+  const broadSelections=selectedKeys.filter(key=>!selectedKeys.some(specific=>isVarietyOf(specific,key)));
   const broadMatches=new Map();
-  for (const [family,variants] of productFamilies) {
-    const specific=variants.find(key=>selected.has(key));
-    if (!specific && selected.has(family)) for (const key of variants) broadMatches.set(key,family);
-    if (specific) broadMatches.set(family,specific);
+  function broadMatch(key) {
+    if (!broadMatches.has(key)) {
+      const specific=selectedKeys.find(product=>isVarietyOf(product,key));
+      broadMatches.set(key,specific??broadSelections.find(product=>isVarietyOf(key,product)));
+    }
+    return broadMatches.get(key);
   }
   return recipes.flatMap(recipe=>{
     const requirements=new Map(recipe.ingredients.map(item=>[productKey(item.name),item.name]));
@@ -137,7 +155,7 @@ export function matchRecipes(recipes,products,{useBasics=true}={}) {
     for (const [key,name] of requirements) {
       const exact=selected.has(key)?key:substitutions.get(key)?.find(option=>selected.has(option));
       const assumed=useBasics && defaultProducts.has(key);
-      const broad=broadMatches.get(key);
+      const broad=exact || assumed?undefined:broadMatch(key);
       const matched=exact??broad;
       if (matched) {
         used.add(matched);

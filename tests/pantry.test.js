@@ -93,3 +93,23 @@ test('общие названия из ручного ввода находят 
   assert.equal(result.has('Томатный соус'),false);
   assert.deepEqual(matchRecipes(dishes,['рисовая мука']).map(match=>match.recipe.name),['Блины']);
 });
+
+test('общие названия находят разновидности из новых рецептов по целым словам',()=>{
+  const dishes=[
+    recipe('Салат',['Полутвёрдый сыр','Яблочный уксус 5%','Лук красный']),
+    recipe('Запеканка',['Цветная капуста','Ржаная мука цельнозерновая']),
+    recipe('Рыба',['Сырой лосось','Чернослив']),
+    recipe('Соус',['Крем-сыр','Бальзамический уксус']),
+    recipe('Спагетти',['Спагетти цельнозерновые'])
+  ];
+  const names=productCatalog(dishes);
+  const entered=updateProducts([],splitProducts('сыр, уксус, капуста, лук, ржаная мука',names),names);
+  const result=matchRecipes(dishes,entered);
+  assert.deepEqual(result.map(({recipe,check})=>[recipe.name,check]),[
+    ['Салат',['Полутвёрдый сыр','Яблочный уксус 5%','Лук красный']],
+    ['Запеканка',['Цветная капуста','Ржаная мука цельнозерновая']],
+    ['Соус',['Крем-сыр','Бальзамический уксус']]
+  ]);
+  assert.deepEqual(matchRecipes(dishes,['сыр','полутвёрдый сыр']).map(({recipe})=>recipe.name),['Салат']);
+  assert.deepEqual(matchRecipes(dishes,['макароны'])[0].check,['Спагетти цельнозерновые']);
+});

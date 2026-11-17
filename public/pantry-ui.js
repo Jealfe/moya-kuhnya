@@ -78,10 +78,10 @@ export function createPantry(dialog,storage,initialPantry,onSaved) {
   }
 
   function preview() {
-    const pending=splitProducts(input().value,catalog).filter(name=>catalog.has(productKey(name)));
+    const pending=splitProducts(input().value,catalog);
     const matches=matchRecipes(currentRecipes,[...products,...pending],{useBasics});
     const panel=get('[data-pantry-preview]');
-    panel.hidden=!products.length && !pending.length;
+    panel.hidden=!products.length && !matches.length;
     const ready=matches.filter(isReady);
     const partial=matches.filter(match=>!isReady(match));
     panel.innerHTML=matches.length?
