@@ -1,11 +1,18 @@
-import { addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseBackup, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { installSelectMenus } from './select-menus.js';
+import { createAi } from './ai-ui.js';
+import { isAndroid } from './native.js';
+import { makeBackup, readBackup } from './backup.js';
+import { createAutoBackup } from './auto-backup.js';
+import { plannedIds, removePlannedRecipe, addPlanShopping, addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { preparationTasks, reminderTime, stepNote, stepNoteKey } from './cooking-extras.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
-import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
-import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
+import { area, button, clock, closeControl, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
+import { catalog, catalogMatches, catalogResults, cookPage, dishCount, goalLabels, historyPage, home, planSheet, planShoppingLabel, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
+document.documentElement.dataset.platform=isAndroid()?'android':'web';
 const main=document.querySelector('main');
 const header=document.querySelector('#header');
 const navigation=document.querySelector('#navigation');
@@ -15,14 +22,57 @@ const pantryDialog=document.querySelector('#pantry-dialog');
 const notice=document.querySelector('#notice');
 const routes=[['home','Главная'],['recipes','Рецепты'],['shopping','Покупки'],['history','История'],['settings','Настройки']];
 const recipeBase='./data/recipes/';
-const filters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
+const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false,quick20:false,noOven:false,onePan:false};
+const filters={...defaultFilters};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
 let pantry, drafts, deletedBatch=null, checkingGitHub=false;
 let draft=null, draftKey=null, period='week', importRows=null, restoreData=null;
 let installEvent, workerRegistration, wakeLock, wakePending=false, audio, noticeTimeout, working=false;
-let pendingUpdate=false, offlineReady=false, timerSignature='';
+let pendingUpdate=false, offlineReady=isAndroid(), timerSignature='';
 const announced=new Set();
+let timerNotificationStatus=null;
+
+function timerPlugin() {
+  return isAndroid()?globalThis.Capacitor?.Plugins?.KitchenTimers:null;
+}
+const reviewReminderFor = id => state.reviewReminders?.find(item=>item.entryId===id);
+function removeReviewReminder(current,id) {
+  current.reviewReminders=(current.reviewReminders??[]).filter(item=>item.entryId!==id);
+}
+
+async function syncTimerNotifications() {
+  const plugin=timerPlugin();
+  if (!plugin || !state) return;
+  const session=state.session;
+  const timers=(session?.reporting?[]:session?.timers??[]).filter(timer=>timer.end!==null).map(timer=>({
+    key:session.id+':'+timer.id,end:timer.end,name:timer.name,recipe:session.recipe.name,sound:state.settings.sound
+  }));
+  const pending=new Map(state.history.filter(entry=>entry.pending).map(entry=>[entry.id,entry]));
+  for (const {entryId,at} of state.reviewReminders??[]) {
+    if (pending.has(entryId)) timers.push({key:'review:'+entryId,end:at,review:entryId,recipe:pending.get(entryId).name});
+  }
+  try {
+    timerNotificationStatus=await plugin.sync({timers});
+  } catch {
+    timerNotificationStatus=null;
+  }
+}
+
+function timerNotificationPanel() {
+  if (!timerPlugin()) return '';
+  const status=timerNotificationStatus;
+  const allowed=state.settings.sound?status?.soundAvailable:status?.silentAvailable;
+  return '<section class="panel padded form-stack"><h2>Уведомления таймеров</h2><p>'+
+    (!status?'Не удалось проверить разрешения Android.':!allowed?'Разрешите уведомления таймеров в Android.':
+      status.exact?'Уведомления таймеров включены.':'Уведомления включены. Для точного сигнала разрешите будильники и напоминания.')+
+    '</p><div class="actions">'+
+    (!status?.enabled?button('Разрешить уведомления','timer-notification-permission'):'')+
+    button('Настройки уведомлений Android','timer-notification-settings')+
+    (!status?.exact?button('Разрешить точные сигналы','timer-notification-exact'):'')+'</div></section>';
+}
+const autoBackup=createAutoBackup({getBackup:async()=>makeBackup(await storage.readBackup()),notice:message=>say(message)});
+const ai=createAi({getState:()=>state,findRecipe:id=>findRecipe(id),change:mutate=>change(mutate,{backup:true}),render:()=>render(),showDialog,showError:error=>showError(error)});
 
 const route = () => (location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
 const navigate = (path) => { location.hash='/'+path; };
@@ -31,7 +81,7 @@ const findRecipe = id => catalogItems().find(recipe=>recipe.id===id);
 const getPortions = recipe => portions.get(recipe.id) ?? recipe.servings;
 function persistDraft(key,value) {
   if (value===null) delete drafts[key]; else drafts[key]=structuredClone(value);
-  void storage.saveDraft(key,value).catch(()=>say('Не удалось сохранить черновик на устройстве.'));
+  void storage.saveDraft(key,value).then(()=>autoBackup.schedule()).catch(()=>say('Не удалось сохранить черновик на устройстве.'));
 }
 function saveReportDraft(form) {
   const key='report/'+form.dataset.entry;
@@ -47,34 +97,70 @@ function saveReportDraft(form) {
 function say(message,undo=false) {
   clearTimeout(noticeTimeout);
   notice.textContent=message;
-  if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'quiet'}));
-  noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?10000:5500);
+  if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'inline-action',symbol:'back'}));
+  noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?5000:5500);
 }
-function showDialog(title,content) {
-  dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+button('Закрыть','dialog-close',{kind:'quiet',symbol:'close'})+'</div>'+content;
+function showDialog(title,content,{sheet=false}={}) {
+  dialog.classList.toggle('plan-sheet',sheet);
+  dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+closeControl('data-do="dialog-close"')+'</div>'+content;
   if (!dialog.open) dialog.showModal();
 }
+const planRecipes = () => {
+  const recipes=new Map(catalogItems().map(recipe=>[recipe.id,recipe]));
+  return plannedIds(state).map(id=>recipes.get(id)).filter(Boolean);
+};
+function showPlan(selected) {
+  showDialog('План готовки',planSheet(state,planRecipes(),selected),{sheet:true});
+}
+
+function showReviewReminder(id) {
+  const entry=state.history.find(item=>item.id===id && item.pending);
+  if (!entry || !timerPlugin()) return;
+  const reminder=reviewReminderFor(id);
+  const tomorrow=new Date(reminder?.at??Date.now()+3600000);
+  const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  showDialog('Напомнить об отзыве','<p>'+h(entry.name)+'</p>'+
+    '<form id="review-reminder-form" class="form-stack" data-entry="'+h(id)+'">'+
+    (reminder?'<p class="muted">Сейчас: '+h(dateLabel(reminder.at))+'</p>':'')+
+    field('Когда напомнить',select('when',[['hour','Через час'],['tomorrow','Завтра в 19:00'],['custom','Своё время']],reminder?'custom':'hour'))+
+    '<div data-custom-reminder '+(reminder?'':'hidden')+'>'+
+    field('Дата и время',input('at',local,'type="datetime-local" '+(reminder?'required':'disabled')))+'</div>'+
+    '<div class="actions"><button class="btn primary">Сохранить напоминание</button>'+
+    (reminder?button('Отменить напоминание','review-reminder-cancel',{id,kind:'inline-action danger',symbol:'close'}):'')+'</div>'+
+    '<p class="muted" data-reminder-status role="status" hidden></p>'+
+    '<div data-review-settings hidden>'+button('Настройки уведомлений Android','timer-notification-settings')+'</div></form>');
+}
 function confirmAction(title,message,label,action,id='') {
-  showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+button('Отмена','dialog-close')+'</div>');
+  showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+
+    button('Отмена','dialog-close',{kind:'inline-action',symbol:'back'})+'</div>');
 }
-const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>');
-async function change(mutate) {
+const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>'+
+  (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
+async function change(mutate,{backup=false}={}) {
   state=await storage.change(current=>{mutate(current); return current;});
+  await syncTimerNotifications();
+  if (backup) void autoBackup.save(); else autoBackup.schedule();
+  await ai.refreshAdvice();
 }
-async function changeSession(mutate) {
+async function changeSession(mutate,options) {
   const id=state.session?.id;
   await change(current=>{
     if (!current.session || current.session.id!==id) throw Error('Готовка уже изменилась в другой вкладке.');
     mutate(current.session,current);
-  });
+  },options);
 }
 
+function syncSystemBars() {
+  const device=globalThis.Capacitor?.Plugins?.KitchenDevice;
+  if (isAndroid() && device) void device.setTheme({theme:state.settings.theme,light:state.settings.theme==='light'}).catch(()=>{});
+}
 function render({focus=false}={}) {
   if (!state) return;
   const [page,id,origin]=route();
   const tab=['recipe','editor','cook'].includes(page)?'recipes':page==='impression'?'history':page;
+  if (document.documentElement.dataset.theme!==state.settings.theme) syncSystemBars();
   document.documentElement.dataset.theme=state.settings.theme;
-  document.querySelector('meta[name="theme-color"]').content=state.settings.theme==='dark'?'#181a15':'#f6f2e8';
+  document.querySelector('meta[name="theme-color"]').content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   const recipes=catalogItems();
   const recipe=id?findRecipe(id):null;
   header.innerHTML='<div class="header-inner"><a class="brand" href="#/home">'+icon('logo')+'<span>Моя кухня</span></a><div class="header-right">'+
@@ -90,7 +176,7 @@ function render({focus=false}={}) {
       main.innerHTML=catalog(recipes,filters,checkingGitHub);
       catalogResults(state,recipes,filters);
       break;
-    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe),false,origin==='from-pantry'):unavailable(); break;
+    case 'recipe': main.innerHTML=recipe?recipePage(state,recipe,getPortions(recipe),false,origin==='from-pantry',ai):unavailable(); break;
     case 'editor':
       if (id && !recipe) { main.innerHTML=unavailable(); break; }
       if (draftKey!==(id??'')) {
@@ -99,15 +185,20 @@ function render({focus=false}={}) {
       }
       main.innerHTML=editor(draft,id,drafts['editor-photo/'+draftKey]);
       break;
-    case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id]); break;
+    case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id],ai); break;
     case 'impression': {
-      const entry=state.history.find(item=>item.id===id && item.pending);
-      main.innerHTML=entry?reportPage(entry,drafts['report/'+id]):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
+      const entry=state.history.find(item=>item.id===id);
+      main.innerHTML=entry?reportPage(entry,drafts['report/'+id],false,reviewReminderFor(id),Boolean(timerPlugin())):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
       break;
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
-    case 'history': main.innerHTML=historyPage(state,id,period); break;
-    case 'settings': main.innerHTML=settingsPage(state,offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ появится после загрузки опубликованной сборки.',Boolean(installEvent)); break;
+    case 'history': main.innerHTML=historyPage(state,id,period,ai,findRecipe,Boolean(timerPlugin())); break;
+    case 'settings':
+      main.innerHTML=settingsPage(state,{
+        section:id,offline:isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',
+        install:Boolean(installEvent),ai:ai.settings(),timers:timerNotificationPanel(),autoBackup:autoBackup.panel()
+      });
+      break;
     default: main.innerHTML=empty('Страница не найдена','Перейдите на главную.',link('На главную','home',{kind:'primary'}));
   }
   renderDock(true);
@@ -120,20 +211,34 @@ function render({focus=false}={}) {
 
 function onRoute() {
   const [page,id]=route();
+  if (dialog.open && dialog.classList.contains('plan-sheet')) dialog.close();
   if (page!=='editor') {draft=null; draftKey=null;}
   const wasOpen=pantryDialog.open;
   const mode=page==='recipes'?pantryMode(id):null;
   if (!mode) pantry.show(null);
   render({focus:true});
-  if (mode) pantry.show(mode,catalogItems());
+  if (mode) {
+    const recipes=catalogItems();
+    pantry.show(mode,recipes,catalogMatches(state,recipes,filters));
+  }
   else if (wasOpen && page==='recipes') main.querySelector('.catalog-options a').focus();
+}
+function chooseFeatured(previous) {
+  const recipes=catalogItems();
+  const choices=recipes.filter(recipe=>recipe.id!==previous);
+  const selected=choices[Math.floor(Math.random()*choices.length)]??recipes[0];
+  featuredId=selected?.id;
+  if (featuredId) {
+    try {localStorage.setItem('last-featured-recipe',featuredId);} catch {}
+  }
 }
 function nextCountdown(timers,now=Date.now()) {
   return Math.min(...timers.filter(timer=>timer.end!==null && remaining(timer,now)>0).map(timer=>remaining(timer,now)));
 }
 function renderDock(force=false) {
-  const timers=state.session?.timers.filter(timer=>timer.end!==null || timer.remaining!==timer.duration) ?? [];
-  const signature=timers.map(timer=>timer.id+'-'+(timer.end===null?'p':remaining(timer)>0?'r':'x')).join(',');
+  const now=Date.now();
+  const timers=state.session?.timers.filter(timer=>timer.end===null?timer.remaining!==timer.duration:timer.end>now) ?? [];
+  const signature=timers.map(timer=>timer.id+'-'+(timer.end===null?'p':'r')).join(',');
   if (!force && signature===timerSignature) return;
   timerSignature=signature;
   const focused=document.activeElement;
@@ -141,10 +246,9 @@ function renderDock(force=false) {
   const open=details?.open || false;
   dock.hidden=!timers.length;
   if (!timers.length) { dock.innerHTML=''; return; }
-  const next=nextCountdown(timers);
-  const expired=timers.filter(timer=>timer.end!==null && remaining(timer)===0).length;
+  const next=nextCountdown(timers,now);
   dock.innerHTML='<details '+(open?'open':'')+'><summary>'+icon('time')+' Таймеры <strong>'+timers.length+'</strong>'+
-    (expired?' <span class="overdue">Готово: '+expired+'</span>':'')+(Number.isFinite(next)?' <strong class="dock-clock" aria-label="Ближайший таймер">'+clock(next)+'</strong>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
+    (Number.isFinite(next)?' <strong class="dock-clock" aria-label="Ближайший таймер">'+clock(next)+'</strong>':'')+'</summary><div class="dock-list">'+timers.map(timer=>timerCard(timer,false)).join('')+'</div></details>';
   if (focused?.dataset.do && details?.contains(focused)) {
     [...dock.querySelectorAll('[data-do]')].find(el=>el.dataset.do===focused.dataset.do && el.dataset.id===focused.dataset.id)?.focus();
   }
@@ -174,7 +278,7 @@ function tick() {
     if (announced.has(key)) continue;
     announced.add(key);
     say('Таймер завершён · '+timer.name);
-    beep();
+    if (!timerNotificationStatus?.exact || !timerNotificationStatus.soundAvailable) beep();
   }
 }
 function unlockSound() {
@@ -260,7 +364,8 @@ function importPreview(rows) {
     seen.add(recipe.id);
     return '<div class="import-row">'+photo(recipe.image,recipe.name)+'<div><h3>'+h(recipe.name)+'</h3><p>'+h(recipe.description)+'</p><p class="muted">'+h(recipe.category)+' · '+recipe.ingredients.length+' ингредиентов · '+recipe.steps.length+' шагов</p>'+
       (duplicate?field('Этот ID уже встречается',select('choice-'+index,[['copy','Создать копию'],['replace','Заменить'],['skip','Пропустить']],'copy')):'')+'</div></div>';
-  }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+button('Отмена','dialog-close')+'</div></form>');
+  }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+
+    button('Отмена','dialog-close',{kind:'inline-action',symbol:'back'})+'</div></form>');
 }
 
 function updateGitHubButton() {
@@ -322,15 +427,15 @@ function updateAutomaticStatus(current,recipeId) {
 async function finishCooking(pending=true,report={}) {
   const {id,recipe}=state.session;
   const entry={id,recipeId:recipe.id,name:recipe.name,at:Date.now(),minutes:Math.round(duration(state.session)/60000),
-    rating:0,image:'',good:'',errors:'',next:'',again:'',...report,...(pending?{pending:true}:{})};
+    rating:0,image:'',good:'',errors:'',next:'',again:'',servings:state.session.servings,recipeSnapshot:{...structuredClone(recipe),image:''},...report,...(pending?{pending:true}:{})};
   await changeSession((session,current)=>{
     if (current.history.some(item=>item.id===entry.id)) throw Error('Эта готовка уже записана.');
     if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
     current.history.push(entry);
     updateAutomaticStatus(current,entry.recipeId);
-    if (current.planned===entry.recipeId) current.planned=null;
+    removePlannedRecipe(current,entry.recipeId);
     current.session=null;
-  });
+  },{backup:true});
   return entry;
 }
 
@@ -366,6 +471,16 @@ async function onAction(action,id) {
     window.scrollTo(0,scroll);
     return;
   }
+  if (action.startsWith('timer-notification-')) {
+    const plugin=timerPlugin();
+    if (!plugin) return;
+    if (action==='timer-notification-permission') {
+      await plugin.requestNotifications();
+      await syncTimerNotifications();
+      render();
+    } else await plugin.openSettings({exact:action==='timer-notification-exact'});
+    return;
+  }
   if (action.startsWith('timer-')) {
     if (action==='timer-edit') {
       const timer=timerById(id);
@@ -399,8 +514,7 @@ async function onAction(action,id) {
     case 'start': if (validPortions(id)) await startCooking(id); return;
     case 'start-replace': await startCooking(id,true); return;
     case 'random': {
-      const choices=catalogItems().filter(recipe=>recipe.id!==featuredId);
-      featuredId=choices[Math.floor(Math.random()*choices.length)]?.id ?? featuredId;
+      chooseFeatured(featuredId);
       break;
     }
     case 'favorite':
@@ -411,16 +525,42 @@ async function onAction(action,id) {
         return;
       }
       break;
-    case 'plan': await change(current=>{current.planned=current.planned===id?null:id;}); say(state.planned?'Добавлено в план':'Убрано из плана'); break;
+    case 'reset-filters':
+      Object.assign(filters,defaultFilters);
+      render();
+      main.querySelector('#filters input[name="query"]').focus();
+      return;
+    case 'open-plan': showPlan(); return;
+    case 'plan-sheet-remove': {
+      const selected=new Set(new FormData(dialog.querySelector('#plan-shopping-form')).getAll('recipe'));
+      await change(current=>removePlannedRecipe(current,id));
+      render();
+      showPlan(selected);
+      return;
+    }
+    case 'plan': {
+      if (!recipe || !plannedIds(state).includes(id) && !validPortions(id)) return;
+      let added;
+      await change(current=>{
+        const ids=plannedIds(current);
+        added=!ids.includes(id);
+        if (added) {
+          if (ids.length>=2000) throw Error('В плане уже 2000 блюд. Уберите ненужные.');
+          current.planned=[...ids,id];
+          current.planServings=[...(current.planServings??[]),{recipeId:id,servings:getPortions(recipe)}];
+        } else removePlannedRecipe(current,id);
+      });
+      say(added?'Добавлено в план':'Убрано из плана');
+      break;
+    }
     case 'recipe-shop':
       if (!validPortions(id)) return;
       await change(current=>addShoppingBatch(current,recipe,getPortions(recipe)));
       say('Блюдо добавлено отдельным списком');
       return;
-    case 'export-recipe': saveFile(id+'.json',recipe); return;
-    case 'export-all': saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
+    case 'export-all': await saveFile('moya-kuhnya-recipes.json',{format:'moya-kuhnya-recipes',version:1,recipes:catalogItems()}); return;
     case 'import': {
-      const menu=document.querySelector('.recipe-add-menu[open]');
+      const menu=document.querySelector('.recipe-add-menu[open],.detail-menu[open]');
       if (menu) {
         menu.open=false;
         menu.querySelector('summary').focus();
@@ -428,14 +568,34 @@ async function onAction(action,id) {
       fileDialog('import');
       return;
     }
+    case 'auto-backup-folder':
+    case 'auto-backup-now':
+    case 'auto-backup-off':
+      await autoBackup.action(action);
+      break;
     case 'restore': fileDialog('restore'); return;
-    case 'backup': saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',{format:'moya-kuhnya-backup',version:2,created:Date.now(),data:await storage.read()}); return;
+    case 'backup-share':
+    case 'backup': {
+      const saved=await saveFile('moya-kuhnya-backup-'+new Date().toISOString().slice(0,10)+'.json',
+        await makeBackup(await storage.readBackup()),{maxMb:256,share:action==='backup-share'});
+      if (isAndroid() && saved) say('Резервная копия сохранена');
+      return;
+    }
     case 'restore-confirm': {
       const snapshot=restoreData;
       if (!snapshot) return;
       dialog.close();
       say('Восстанавливаем данные…');
-      state=await storage.change(()=>snapshot);
+      state=await storage.restoreBackup(snapshot);
+      await syncTimerNotifications();
+      if (snapshot.drafts) {
+        drafts=Object.fromEntries(snapshot.drafts.map(({id,value})=>[id,value]));
+        draft=null;
+        draftKey=null;
+      }
+      if (snapshot.pantry) pantry.restore(snapshot.pantry);
+      void autoBackup.save();
+      await ai.refreshAdvice();
       say('Данные восстановлены');
       break;
     }
@@ -482,6 +642,17 @@ async function onAction(action,id) {
     }
     case 'cook-step': await changeSession(session=>{session.step=Math.max(0,Math.min(session.recipe.steps.length-1,+id));}); render({focus:true}); return;
     case 'cook-check': await changeSession(session=>{session.done=session.done.includes(session.step)?session.done.filter(i=>i!==session.step):[...session.done,session.step];}); break;
+    case 'step-note': {
+      const session=state.session;
+      if (!session || session.reporting) return;
+      const note=stepNote(state,session.recipe,session.step);
+      showDialog('Моя заметка к шагу','<form id="step-note-form" class="form-stack" data-session="'+h(session.id)+
+        '" data-step="'+session.step+'"><p>'+h(session.recipe.steps[session.step].title)+'</p>'+
+        field('Заметка',area('note',note,'rows="4" maxlength="1200"'))+
+        '<div class="actions"><button class="btn primary">Сохранить заметку</button>'+
+        (note?'<button class="btn inline-action danger" name="remove" value="yes">'+icon('minus')+'Удалить заметку</button>':'')+'</div></form>');
+      return;
+    }
     case 'cook-pause':
       await changeSession(session=>{
         const now=Date.now();
@@ -501,9 +672,16 @@ async function onAction(action,id) {
       return;
     }
     case 'report-back': await changeSession(session=>{session.reporting=false; session.activeSince=Date.now();}); break;
+    case 'review-reminder': showReviewReminder(id); return;
+    case 'review-reminder-cancel':
+      await change(current=>removeReviewReminder(current,id),{backup:true});
+      dialog.close();
+      say('Напоминание отменено');
+      break;
     case 'cook-cancel': confirmAction('Отменить готовку?','Шаги и таймеры этой попытки будут удалены.','Отменить готовку','cook-discard'); return;
     case 'cook-discard': await changeSession((session,current)=>{current.session=null;}); dialog.close(); navigate('home'); return;
     case 'history-delete': {
+      document.querySelector('.entry-menu[open]')?.removeAttribute('open');
       const entry=state.history.find(item=>item.id===id);
       if (!entry) return;
       confirmAction('Удалить запись?',
@@ -523,13 +701,15 @@ async function onAction(action,id) {
         const index=current.history.findIndex(entry=>entry.id===id);
         if (index!==-1) {
           const [entry]=current.history.splice(index,1);
+        removeReviewReminder(current,entry.id);
+          current.aiAnalyses=(current.aiAnalyses??[]).filter(item=>item.entryId!==entry.id);
           const status=current.statuses.find(item=>item.id===entry.recipeId);
           if (reset && status?.automatic===undefined && ['tried','repeat'].includes(status?.status) &&
               !current.history.some(item=>item.recipeId===entry.recipeId)) current.statuses=current.statuses.filter(item=>item.id!==entry.recipeId);
           else updateAutomaticStatus(current,entry.recipeId);
           removed=true;
         }
-      });
+      },{backup:true});
       dialog.close();
       if (removed) persistDraft('report/'+id,null);
       say(removed?'Запись удалена из истории':'Запись уже удалена');
@@ -556,8 +736,9 @@ async function run(work) {
 }
 
 document.addEventListener('click',event=>{
-  const menu=document.querySelector('.recipe-add-menu[open]');
-  if (menu && !menu.contains(event.target)) menu.open=false;
+  for (const menu of document.querySelectorAll('.recipe-add-menu[open],.quick-filters[open]')) {
+    if (!menu.contains(event.target)) menu.open=false;
+  }
   if (event.target.closest('.skip')) {
     event.preventDefault();
     main.focus();
@@ -567,12 +748,18 @@ document.addEventListener('click',event=>{
   if (state) unlockSound();
   const control=event.target.closest('[data-do]');
   if (!control) return;
+  const actionMenu=control.closest('.timer-menu,.shopping-menu');
+  if (actionMenu) {
+    actionMenu.open=false;
+    actionMenu.querySelector('summary').focus();
+  }
+  if (control.dataset.do.startsWith('ai-')) {void ai.action(control.dataset.do,control.dataset.id).catch(showError); return;}
   if (control.dataset.do==='check-github') void checkGitHub();
   else void run(()=>onAction(control.dataset.do,control.dataset.id));
 });
 document.addEventListener('keydown',event=>{
   if (event.key!=='Escape' || dialog.open || pantryDialog.open) return;
-  const menu=document.querySelector('.recipe-add-menu[open]');
+  const menu=document.querySelector('.recipe-add-menu[open],.quick-filters[open]');
   if (menu) {
     menu.open=false;
     menu.querySelector('summary').focus();
@@ -611,8 +798,54 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   const target=event.target;
+  const planForm=target.closest('#plan-shopping-form');
+  if (planForm && target.name==='recipe') {
+    const submit=planForm.querySelector('[data-plan-submit]');
+    const count=new FormData(planForm).getAll('recipe').length;
+    submit.disabled=!count;
+    submit.textContent=planShoppingLabel(count);
+    return;
+  }
+  const reminderForm=target.closest('#review-reminder-form');
+  if (reminderForm && target.name==='when') {
+    const custom=target.value==='custom';
+    reminderForm.querySelector('[data-custom-reminder]').hidden=!custom;
+    reminderForm.elements.at.disabled=!custom;
+    reminderForm.elements.at.required=custom;
+    return;
+  }
+  if (target.name==='ai-model') {
+    const custom=target.form.elements['ai-custom-model'];
+    const visible=!target.value;
+    custom.closest('[data-custom-model]').hidden=!visible;
+    custom.disabled=!visible;
+    custom.required=visible;
+    if (visible) custom.focus();
+    return;
+  }
+  if (working && target.hasAttribute('data-prep-task')) {
+    target.checked=state.session?.prepDone?.includes(target.dataset.prepTask)??false;
+    return;
+  }
   void run(async()=>{
-    if (target.name==='recipe-status') {
+    if (target.hasAttribute('data-prep-task')) {
+      const id=target.dataset.prepTask;
+      const checked=target.checked;
+      try {
+        await changeSession(session=>{
+          const selected=new Set(session.prepDone??[]);
+          if (checked) selected.add(id); else selected.delete(id);
+          session.prepDone=[...selected];
+        });
+      } finally {
+        if (target.isConnected && state.session) {
+          const tasks=preparationTasks(state.session.recipe);
+          const done=new Set(state.session.prepDone??[]);
+          target.checked=done.has(id);
+          main.querySelector('[data-prep-count]').textContent=tasks.filter(task=>done.has(task.id)).length+' / '+tasks.length;
+        }
+      }
+    } else if (target.name==='recipe-status') {
       await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value,automatic:false}];});
       say('Статус сохранён');
     } else if (target.dataset.item) {
@@ -628,9 +861,63 @@ document.addEventListener('change',event=>{
 document.addEventListener('submit',event=>{
   if (event.defaultPrevented) return;
   event.preventDefault();
-  const form=event.target, data=new FormData(form);
+  const form=event.target;
+  if (form.id==='ai-step-form') {void ai.askStep(form);return;}
+  if (form.id==='ai-settings') {void ai.save(form);return;}
+  const data=new FormData(form);
   void run(async()=>{
     switch(form.getAttribute('id')) {
+      case 'plan-shopping-form': {
+        let count=0;
+        const selected=new Set(data.getAll('recipe'));
+        if (!selected.size) return;
+        const recipes=planRecipes();
+        await change(current=>{count=addPlanShopping(current,recipes,selected);});
+        dialog.close();
+        say(count?'В покупки добавлено: '+dishCount(count):'Выбранные блюда уже в покупках.');
+        navigate('shopping');
+        return;
+      }
+      case 'step-note-form': {
+        const session=state.session;
+        const index=Number(form.dataset.step);
+        if (!session || session.id!==form.dataset.session || !session.recipe.steps[index]) throw Error('Этот шаг больше недоступен.');
+        const note={recipeId:session.recipe.id,stepKey:stepNoteKey(session.recipe,index),text:event.submitter?.name==='remove'?'':data.get('note').trim()};
+        await change(current=>{
+          if (current.session?.id!==session.id) throw Error('Эта готовка уже изменилась.');
+          const notes=(current.stepNotes??[]).filter(item=>item.recipeId!==note.recipeId || item.stepKey!==note.stepKey);
+          if (note.text && notes.length>=20000) throw Error('Достигнут предел в 20 000 заметок.');
+          current.stepNotes=note.text?[...notes,note]:notes;
+        },{backup:true});
+        break;
+      }
+      case 'review-reminder-form': {
+        const id=form.dataset.entry;
+        const plugin=timerPlugin();
+        if (!plugin) return;
+        const status=form.querySelector('[data-reminder-status]');
+        let at;
+        try {at=reminderTime(data.get('when'),data.get('at'));} catch(error) {
+          status.hidden=false;
+          status.textContent=error.message;
+          return;
+        }
+        const permission=await plugin.requestNotifications();
+        if (!permission.enabled || permission.reviewAvailable===false) {
+          status.hidden=false;
+          status.textContent='Разрешите уведомления об отзывах в настройках Android и нажмите «Сохранить» ещё раз.';
+          form.querySelector('[data-review-settings]').hidden=false;
+          return;
+        }
+        await change(current=>{
+          if (!current.history.some(entry=>entry.id===id && entry.pending)) throw Error('Эта попытка уже оценена или удалена.');
+          removeReviewReminder(current,id);
+          current.reviewReminders.push({entryId:id,at});
+        },{backup:true});
+        say(!timerNotificationStatus?'Время сохранено. Android пока не подтвердил постановку уведомления.':
+          timerNotificationStatus.exact?'Напоминание сохранено · '+dateLabel(at):'Напоминание сохранено. Android может доставить его позже выбранного времени.');
+        break;
+      }
       case 'editor-form': {
         const key=draftKey;
         const saved=structuredClone(captureDraft(form,draft));
@@ -642,7 +929,7 @@ document.addEventListener('submit',event=>{
         if (draftKey===key) draft=saved;
         parseRecipes(saved,recipeSchema,exchange.bundle);
         if (event.submitter?.value==='preview') {showDialog('Предпросмотр рецепта',recipePage(state,saved,saved.servings,true));return;}
-        if (event.submitter?.value==='export') {saveFile(saved.id+'.json',saved);return;}
+        if (event.submitter?.value==='export') {await saveFile(saved.id+'.json',saved);return;}
         await change(current=>{
           const recipes=[...current.recipes.filter(item=>item.id!==saved.id),saved];
           if (recipes.length>1000) throw Error('В локальном каталоге помещается до 1000 добавленных рецептов.');
@@ -696,8 +983,9 @@ document.addEventListener('submit',event=>{
         return;
       }
       case 'restore-file': {
-        restoreData=parseBackup(await readJson(form.elements.file.files[0],256),exchange.backup,exchange.legacyBackup);
-        const summary='Рецептов: '+restoreData.recipes.length+' · Записей дневника: '+restoreData.history.length+' · Покупок: '+shoppingSections(restoreData).reduce((sum,section)=>sum+section.items.length,0)+'.';
+        restoreData=readBackup(await readJson(form.elements.file.files[0],256),exchange);
+        const restored=restoreData.state;
+        const summary='Рецептов: '+restored.recipes.length+' · Записей дневника: '+restored.history.length+' · Покупок: '+shoppingSections(restored).reduce((sum,section)=>sum+section.items.length,0)+'.';
         confirmAction('Заменить локальные данные?',summary+' Существующие данные этого приложения будут заменены содержимым копии.','Восстановить данные','restore-confirm');
         return;
       }
@@ -729,14 +1017,15 @@ document.addEventListener('submit',event=>{
           const entry=await finishCooking(false,{...report,image});
           recipeId=entry.recipeId;
         } else await change(current=>{
-          const entry=current.history.find(item=>item.id===id && item.pending);
-          if (!entry) throw Error('Эта запись уже сохранена или удалена.');
+          const entry=current.history.find(item=>item.id===id);
+          if (!entry) throw Error('Эта запись уже удалена.');
           Object.assign(entry,report);
           if (image) entry.image=image;
           delete entry.pending;
+          removeReviewReminder(current,id);
           recipeId=entry.recipeId;
           updateAutomaticStatus(current,recipeId);
-        });
+        },{backup:true});
         persistDraft(key,null);
         say('Впечатления сохранены');
         navigate('history/'+recipeId);
@@ -758,7 +1047,7 @@ function softRender() {
   if (state && !main.querySelector('#editor-form,#report-form') && !dialog.open && !pantryDialog.open) render();
 }
 async function setupWorker() {
-  if (!('serviceWorker' in navigator) || document.documentElement.dataset.build!=='production') return;
+  if (isAndroid() || !('serviceWorker' in navigator) || document.documentElement.dataset.build!=='production') return;
   try {
     const wasControlled=Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -785,12 +1074,20 @@ addEventListener('appinstalled',()=>{installEvent=null;softRender();say('При�
 addEventListener('hashchange',onRoute);
 addEventListener('online',softRender);
 addEventListener('offline',softRender);
-document.addEventListener('visibilitychange',()=>{refreshWake();tick();});
+document.addEventListener('visibilitychange',()=>{
+  refreshWake();
+  tick();
+  if (state && !document.hidden) {
+    syncSystemBars();
+    void syncTimerNotifications().then(()=>{if (route()[0]==='settings') softRender();});
+  }
+});
 dialog.addEventListener('close',()=>{restoreData=null;importRows=null;});
+installSelectMenus();
 setInterval(tick,250);
 try {
   main.innerHTML='<p class="loading">Открываем «Мою кухню»…</p>';
-  const [ids,schema,exchangeSchema,db]=await Promise.all([json(recipeBase+'index.json'),json('./data/recipe.schema.json'),json('./data/exchange.schema.json'),openStorage()]);
+  const [ids,schema,exchangeSchema,db,aiSchema]=await Promise.all([json(recipeBase+'index.json'),json('./data/recipe.schema.json'),json('./data/exchange.schema.json'),openStorage(),json('./data/ai-result.schema.json')]);
   recipeSchema=schema;
   exchange=exchangeSchema.$defs;
   storage=db;
@@ -798,8 +1095,20 @@ try {
     storage.read(),Promise.all(ids.map(id=>json(recipeBase+id+'.json'))),storage.readDrafts(),storage.readPantry()
   ]);
   [state,builtins,drafts]=[saved,recipes,savedDrafts];
-  pantry=createPantry(pantryDialog,storage,savedPantry);
-  featuredId='pilaf';
+  pantry=createPantry(pantryDialog,storage,savedPantry,()=>autoBackup.schedule());
+  let lastFeatured;
+  try {lastFeatured=localStorage.getItem('last-featured-recipe');} catch {}
+  chooseFeatured(lastFeatured);
+  await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
+  await syncTimerNotifications();
+  const notifications=timerPlugin();
+  if (notifications?.addListener) await notifications.addListener('reviewOpen',({id})=>{
+    const entry=state.history.find(item=>item.id===id && item.pending);
+    if (!entry) {say('Эта попытка уже оценена или удалена.');return;}
+    if (dialog.open) dialog.close();
+    navigate('impression/'+id);
+  });
+  syncSystemBars();
   onRoute();
   tick();
   void setupWorker();

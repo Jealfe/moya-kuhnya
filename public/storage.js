@@ -41,7 +41,30 @@ export async function openStorage() {
   }
   const pantryState = saved => Array.isArray(saved)?{products:saved,useBasics:true}:saved;
   const emptyPantry = () => ({products:[],useBasics:true});
+  const draftRange=()=>IDBKeyRange.bound('draft/','draft0',false,true);
+  function snapshot(mode,operate) {
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('data',mode);
+      const store=tx.objectStore('data');
+      const result=operate(store);
+      tx.oncomplete=()=>resolve(result());
+      tx.onabort=()=>reject(tx.error ?? Error('Не удалось обработать резервную копию.'));
+    });
+  }
   return {
+    readBackup: () => snapshot('readonly',store=>{
+      const state=store.get('state'), pantry=store.get('pantry'), drafts=store.getAll(draftRange());
+      return ()=>({state:{...initialState(),...state.result},pantry:pantryState(pantry.result??emptyPantry()),drafts:drafts.result});
+    }),
+    restoreBackup: ({state,pantry,drafts}) => snapshot('readwrite',store=>{
+      store.put(state,'state');
+      if (pantry) store.put(pantry,'pantry');
+      if (drafts) {
+        store.delete(draftRange());
+        for (const draft of drafts) store.put(draft,'draft/'+draft.id);
+      }
+      return ()=>state;
+    }),
     read: () => transaction('readonly',state=>state),
     change: mutate => transaction('readwrite',mutate),
     readPantry: () => transaction('readonly',pantryState,'pantry',emptyPantry),

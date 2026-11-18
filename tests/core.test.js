@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { activity, addShopping, addShoppingBatch, changeTimer, duration, findShoppingList, initialState, parseBackup, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, statistics } from '../public/core.js';
+import { activity, addPlanShopping, addShopping, addShoppingBatch, changeTimer, duration, findShoppingList, initialState, parseBackup, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, shoppingTotals, statistics } from '../public/core.js';
+import { matchesQuickFilters, preparationTasks, reminderTime, stepNote, stepNoteKey } from '../public/cooking-extras.js';
 
 const read = path => JSON.parse(readFileSync(new URL('../public/data/'+path,import.meta.url),'utf8'));
 const schema=read('recipe.schema.json');
@@ -9,6 +10,52 @@ const {bundle,backup,legacyBackup}=read('exchange.schema.json').$defs;
 const ids=read('recipes/index.json');
 const recipes=ids.map(id=>read('recipes/'+id+'.json'));
 const recipe=recipes[0];
+
+test('выбранные блюда плана попадают в покупки без дублей, итог учитывает порции и остаток',()=>{
+  const state=initialState();
+  const dishes=['pilaf','syrniki'].map(id=>recipes.find(recipe=>recipe.id===id));
+  state.planned=dishes.map(recipe=>recipe.id);
+  state.planServings=[{recipeId:'pilaf',servings:5}];
+  assert.equal(addPlanShopping(state,dishes,new Set(['pilaf'])),1);
+  assert.equal(addPlanShopping(state,dishes,new Set(state.planned)),1);
+  assert.equal(addPlanShopping(state,dishes,new Set(state.planned)),0);
+  assert.equal(state.shoppingBatches[0].servings,5);
+  const totals=()=>shoppingTotals(shoppingSections(state)).find(item=>item.name==='Соль');
+  const salt=state.shoppingBatches[0].items.find(item=>item.name==='Соль');
+  assert.equal(totals().quantity,salt.quantity+state.shoppingBatches[1].items.find(item=>item.name==='Соль').quantity);
+  assert.equal(totals().parts.length,2);
+  salt.state='home';
+  assert.equal(totals().parts.length,1);
+  assert.equal(totals().parts[0].name,'Сырники');
+});
+
+test('быстрые фильтры различают одну сковороду, духовку и полное время',()=>{
+  const find=id=>recipes.find(recipe=>recipe.id===id);
+  assert.equal(matchesQuickFilters(find('shakshuka'),{noOven:true,onePan:true}),true);
+  assert.equal(matchesQuickFilters(find('bolognese'),{onePan:true}),false);
+  assert.equal(matchesQuickFilters(find('beef-potato-bake'),{noOven:true}),false);
+  assert.equal(matchesQuickFilters(find('roast-chicken'),{quick20:true}),false);
+  assert.ok(preparationTasks(find('roast-chicken')).some(task=>task.detail?.includes('210 °C')));
+});
+
+test('заметки, напоминания, порции и подготовка проходят резервное копирование',()=>{
+  const data=initialState();
+  data.planned=[recipe.id];
+  data.planServings=[{recipeId:recipe.id,servings:3}];
+  data.session={...sessionFor(recipe,3,1000,'attempt-now'),prepDone:['ingredients']};
+  data.stepNotes=[{recipeId:recipe.id,stepKey:stepNoteKey(recipe,0),text:'Моя заметка'}];
+  data.history=[{id:'earlier',recipeId:recipe.id,name:recipe.name,at:200,minutes:5,rating:0,good:'',errors:'',next:'',again:'',image:'',pending:true}];
+  data.reviewReminders=[{entryId:'earlier',at:reminderTime('hour',null,1000)}];
+  const copy={format:'moya-kuhnya-backup',version:2,created:1000,data};
+  const restored=parseBackup(copy,backup,legacyBackup);
+  assert.deepEqual(restored,data);
+  assert.equal(stepNote(restored,recipe,0),'Моя заметка');
+  const reordered={...recipe,steps:[...recipe.steps].reverse()};
+  assert.equal(stepNote(restored,reordered,reordered.steps.length-1),'Моя заметка');
+  assert.throws(()=>reminderTime('custom','2026-01-01T12:00',Date.UTC(2026,1,1)),/в будущем/);
+  delete data.history[0].pending;
+  assert.throws(()=>parseBackup(copy,backup,legacyBackup),/попыткам без оценки/);
+});
 
 test('каталог из 70 уникальных рецептов проходит проверку формата, источников и связей',()=>{
   assert.equal(new Set(ids).size,70);

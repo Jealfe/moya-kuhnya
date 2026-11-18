@@ -73,3 +73,43 @@ test('основы доступны по умолчанию и не создаю
   assert.deepEqual(matches[1].missing,['Сливочное масло','Оливковое масло']);
   assert.deepEqual(matchRecipes(dishes,['картошка'],{useBasics:false})[1].missing,['Соль','Вода','Растительное масло']);
 });
+
+test('общие названия из ручного ввода находят разновидности продуктов без ложных совпадений',()=>{
+  const dishes=[
+    recipe('Тесто',['Мука пшеничная']),
+    recipe('Блины',['Рисовая мука']),
+    recipe('Макароны с сыром',['Макароны перья']),
+    recipe('Томатный соус',['Томатная паста']),
+    recipe('Пюре',['Картофель молодой'])
+  ];
+  const names=productCatalog(dishes);
+  const entered=updateProducts([],splitProducts('мука, макароны, картошка',names),names);
+  assert.deepEqual(entered,['Мука','Макароны','Картофель молодой']);
+  const result=new Map(matchRecipes(dishes,entered).map(match=>[match.recipe.name,match]));
+  assert.deepEqual(result.get('Тесто').check,['Мука пшеничная']);
+  assert.deepEqual(result.get('Блины').check,['Рисовая мука']);
+  assert.deepEqual(result.get('Макароны с сыром').check,['Макароны перья']);
+  assert.deepEqual(result.get('Пюре').available,['Картофель молодой']);
+  assert.equal(result.has('Томатный соус'),false);
+  assert.deepEqual(matchRecipes(dishes,['рисовая мука']).map(match=>match.recipe.name),['Блины']);
+});
+
+test('общие названия находят разновидности из новых рецептов по целым словам',()=>{
+  const dishes=[
+    recipe('Салат',['Полутвёрдый сыр','Яблочный уксус 5%','Лук красный']),
+    recipe('Запеканка',['Цветная капуста','Ржаная мука цельнозерновая']),
+    recipe('Рыба',['Сырой лосось','Чернослив']),
+    recipe('Соус',['Крем-сыр','Бальзамический уксус']),
+    recipe('Спагетти',['Спагетти цельнозерновые'])
+  ];
+  const names=productCatalog(dishes);
+  const entered=updateProducts([],splitProducts('сыр, уксус, капуста, лук, ржаная мука',names),names);
+  const result=matchRecipes(dishes,entered);
+  assert.deepEqual(result.map(({recipe,check})=>[recipe.name,check]),[
+    ['Салат',['Полутвёрдый сыр','Яблочный уксус 5%','Лук красный']],
+    ['Запеканка',['Цветная капуста','Ржаная мука цельнозерновая']],
+    ['Соус',['Крем-сыр','Бальзамический уксус']]
+  ]);
+  assert.deepEqual(matchRecipes(dishes,['сыр','полутвёрдый сыр']).map(({recipe})=>recipe.name),['Салат']);
+  assert.deepEqual(matchRecipes(dishes,['макароны'])[0].check,['Спагетти цельнозерновые']);
+});

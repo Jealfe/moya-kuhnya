@@ -17,10 +17,10 @@ const datalist = (id,values) => '<datalist id="'+id+'">'+values.map(value=>'<opt
 const mover = (kind,index,length) =>
   button('↑','editor-'+kind+'-up',{id:index,disabled:index===0})+
   button('↓','editor-'+kind+'-down',{id:index,disabled:index===length-1})+
-  button('Удалить','editor-'+kind+'-delete',{id:index,kind:'quiet danger',disabled:length===1});
+  button('Удалить','editor-'+kind+'-delete',{id:index,kind:'inline-action danger',symbol:'minus',disabled:length===1});
 
 export function editor(recipe,original,selectedPhoto) {
-  return link(original?'К рецепту':'К рецептам',original?'recipe/'+original:'recipes',{kind:'quiet'})+
+  return link(original?'К рецепту':'К рецептам',original?'recipe/'+original:'recipes',{kind:'inline-action',symbol:'back'})+
     heading(original?'Редактировать рецепт':'Новый рецепт','Сохраните ингредиенты, шаги и таймеры для следующей готовки.')+
     '<form id="editor-form" class="form-stack">'+datalist('categories',categories)+datalist('groups',groups)+
     '<section class="panel padded form-stack"><h2>О блюде</h2><div class="form-grid">'+
@@ -29,7 +29,7 @@ export function editor(recipe,original,selectedPhoto) {
     '<div class="form-grid four-fields">'+field('Порций',number('servings',recipe.servings,1,100))+field('Сложность 1–5',number('difficulty',recipe.difficulty,1,5))+
     field('Подготовка, мин',number('prep',recipe.prep,0,1440))+field('Готовка, мин',number('cook',recipe.cook,1,1440))+'</div>'+
     (recipe.image?photo(recipe.image,recipe.name,'edit-photo'):'')+
-    ((recipe.image||selectedPhoto)?button('Убрать фото','editor-photo-delete',{kind:'quiet danger'}):'')+
+    ((recipe.image||selectedPhoto)?button('Убрать фото','editor-photo-delete',{kind:'inline-action danger',symbol:'minus'}):'')+
     (selectedPhoto?'<p class="muted draft-photo">'+h(selectedPhoto.name)+'</p>':'')+
     field('Фото',input('image','','type="file" accept="image/jpeg,image/png,image/webp"'))+
     field('Посуда и инструменты, по одному на строку',textarea('tools',recipe.tools.join('\n'),4800,true))+'</section>'+
@@ -48,11 +48,12 @@ export function editor(recipe,original,selectedPhoto) {
       '<details '+(step.ingredients.length?'open':'')+'><summary>Продукты на шаге</summary><div class="ingredient-checks">'+
       recipe.ingredients.map((item,k)=>'<label class="toggle"><input type="checkbox" name="step-ingredient" value="'+h(item.id)+'" '+(step.ingredients.includes(item.id)?'checked':'')+'>'+h(item.name||'Ингредиент '+(k+1))+'</label>').join('')+'</div></details>'+
       step.timers.map((timer,j)=>'<div class="edit-timer" data-edit-timer><div class="form-grid">'+field('Название таймера',text('timer-name',timer.name,90))+
-        field('Длительность, секунд',number('timer-seconds',timer.seconds,1,86400))+'</div>'+button('Удалить таймер','editor-timer-delete',{id:i+'-'+j,kind:'quiet danger'})+'</div>').join('')+
+        field('Длительность, секунд',number('timer-seconds',timer.seconds,1,86400))+'</div>'+button('Удалить таймер','editor-timer-delete',{id:i+'-'+j,kind:'inline-action danger',symbol:'minus'})+'</div>').join('')+
       '<div class="actions">'+button('Добавить таймер','editor-timer-add',{id:i,symbol:'time',disabled:step.timers.length>=8})+mover('step',i,recipe.steps.length)+'</div></fieldset>').join('')+'</section>'+
     '<section class="panel padded form-stack"><h2>Советы</h2>'+field('Советы, по одному на строку',textarea('tips',recipe.tips.join('\n'),10000))+
     field('Типичные ошибки, по одной на строку',textarea('mistakes',recipe.mistakes.join('\n'),10000))+'</section>'+
-    '<div class="actions"><button class="btn primary" name="mode" value="save">Сохранить рецепт</button><button class="btn" name="mode" value="preview">Предпросмотр</button><button class="btn" name="mode" value="export">Экспортировать JSON</button>'+button('Сбросить черновик','editor-reset',{kind:'quiet danger'})+'</div></form>';
+    '<div class="actions"><button class="btn primary" name="mode" value="save">Сохранить рецепт</button><button class="btn" name="mode" value="preview">Предпросмотр</button><button class="btn" name="mode" value="export">Экспортировать JSON</button>'+
+    button('Сбросить черновик','editor-reset',{kind:'inline-action danger',symbol:'reset'})+'</div></form>';
 }
 
 export function captureDraft(form,draft) {
