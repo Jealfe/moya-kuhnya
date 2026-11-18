@@ -91,9 +91,6 @@ main:focus {outline:none}
 .stat strong {display:block;font:2rem/1 var(--serif);margin-bottom:6px}
 .stat div span {color:var(--muted);font-size:.88rem}
 .duo,.detail-body,.cook-layout,.entry-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
-.duo .mini {padding:20px}
-.mini h3 {margin-top:8px}
-.mini p {color:var(--muted)}
 .cards {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .recipe-card {position:relative;display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .recipe-card:hover {border-color:var(--olive)}
@@ -554,12 +551,14 @@ html {background:var(--bg)}
 .cooking-plan a,.history-recipe-link {color:var(--olive);text-decoration:underline;text-underline-offset:4px}
 .cooking-plan a {padding:10px 0;overflow-wrap:anywhere}
 .cooking-plan a small {display:block;margin-top:3px;color:var(--muted);font-weight:500}
-.home-plan-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
-.home-plan-heading .kicker {margin:0}
-.home-plan-heading .home-plan-open {flex:none;min-height:44px;padding-inline:9px;border-radius:9px;font-size:.85rem}
+.home-summary {gap:10px;align-items:start}
+.home-summary>.panel {padding:5px 16px 9px}
+.home-summary-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+.home-summary-heading .btn.inline-action {flex:none;padding-inline:8px 0;font-size:.85rem}
+.home-summary p {margin:4px 0 0;color:var(--muted)}
 .home-plan-list {list-style:none;padding:0;margin:0}
 .home-plan-list li {border-top:1px solid var(--line)}
-.home-plan-list a {display:grid;align-content:center;gap:3px;min-height:48px;padding:8px 0;color:var(--olive);overflow-wrap:anywhere}
+.home-plan-list a {display:grid;align-content:center;gap:2px;min-height:44px;padding:6px 0;color:var(--olive);overflow-wrap:anywhere}
 .home-plan-list strong {text-decoration:underline;text-underline-offset:3px}
 .home-plan-list small {color:var(--muted)}
 dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(100%,640px);max-height:88dvh;padding:0;
@@ -693,7 +692,6 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
 .btn.inline-action.close-action {width:44px;min-width:44px;flex:none;padding:0}
 .close-action .icon {width:22px;height:22px}
 .btn.inline-action.plan-remove {border-inline-start:1px solid var(--line);padding-inline:9px 0}
-.btn.inline-action.home-plan-open {flex:none;font-size:.85rem}
 .entry-footer-link.btn.inline-action {padding-inline:7px}
 .entry-footer-link+.entry-footer-link.btn.inline-action {border-inline-start:1px solid var(--line)}
 .plan-sheet .cooking-plan a {text-decoration:none}
@@ -701,22 +699,22 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
 .recipe-add-actions>.btn {border:0;border-radius:0}
 .recipe-add-actions>.btn+.btn {border-top:1px solid var(--line)}
 .btn.inline-action:active:not(:disabled),.btn.inline-action:focus-visible {
-  background:transparent;box-shadow:none;text-shadow:0 0 9px color-mix(in srgb,currentColor 60%,transparent)
+  background:transparent;box-shadow:none
 }
-.btn.inline-action:is(:active,:focus-visible):not(:disabled) .icon {
-  filter:drop-shadow(0 0 4px color-mix(in srgb,currentColor 55%,transparent))
+.btn.inline-action:not(:disabled,.close-action) {
+  text-shadow:0 0 3px color-mix(in srgb,currentColor 27%,transparent)
+}
+[data-theme=light] .btn.inline-action:not(:disabled,.close-action) {
+  text-shadow:0 0 3px color-mix(in srgb,currentColor 15%,transparent)
 }
 @media(hover:hover) {
-  .btn.inline-action:hover:not(:disabled) {
-    background:transparent;text-shadow:0 0 8px color-mix(in srgb,currentColor 48%,transparent)
-  }
+  .btn.inline-action:hover:not(:disabled) {background:transparent;text-decoration:underline;text-underline-offset:4px}
   .plan-sheet .cooking-plan a:hover {text-decoration:underline}
 }
 @media(prefers-reduced-motion:no-preference) {
-  .btn.inline-action {transition:text-shadow .2s ease-out}
-  .btn.inline-action .icon {transition:filter .2s ease-out}
-  .plan-sheet[open] :is(.plan-remove,.plan-footer .inline-action) {animation:plan-action-glow .8s .12s ease-out both}
-  @keyframes plan-action-glow {
-    35% {text-shadow:0 0 9px color-mix(in srgb,currentColor 48%,transparent)}
+  :root:not([data-theme=light]) .btn.inline-action:not(:disabled,.close-action) {animation:inline-text-glow 3.4s ease-in-out infinite alternate}
+  @keyframes inline-text-glow {
+    from {text-shadow:0 0 3px color-mix(in srgb,currentColor 27%,transparent)}
+    to {text-shadow:0 0 7px color-mix(in srgb,currentColor 55%,transparent)}
   }
 }

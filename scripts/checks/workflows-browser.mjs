@@ -57,7 +57,7 @@ try {
   const homePlan=page.locator('.home-plan');
   assert.equal(await homePlan.locator('.home-plan-list li').count(),2);
   assert.equal(await homePlan.locator('.home-plan-list a[href="#/recipe/pilaf"] small').count(),1);
-  const heading=await homePlan.locator('.home-plan-heading').boundingBox();
+  const heading=await homePlan.locator('.home-summary-heading').boundingBox();
   const planButton=await action('open-plan').boundingBox();
   assert.ok(Math.abs(heading.x+heading.width-planButton.x-planButton.width)<2);
   await action('open-plan').click();
@@ -77,7 +77,9 @@ try {
   assert.ok(await plan.locator('.plan-footer').evaluate(el=>el.lastElementChild.offsetTop>el.firstElementChild.offsetTop));
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await removeDish.evaluate(el=>getComputedStyle(el).animationName),'none');
+  assert.notEqual(await removeDish.evaluate(el=>getComputedStyle(el).textShadow),'none');
   await page.emulateMedia({reducedMotion:'no-preference'});
+  assert.equal(await removeDish.evaluate(el=>getComputedStyle(el).animationIterationCount),'infinite');
   assert.equal(await page.locator('.cooking-plan li').count(),2);
   assert.equal(await page.locator('.cooking-plan a small').count(),2);
   await page.getByText(/Порций: 5/).waitFor();

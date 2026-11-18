@@ -20,9 +20,12 @@ export function home(state, recipes, featured) {
     '<section class="hero"><div class="hero-copy"><div class="kicker">'+icon('spark')+' Блюдо дня</div><h1>Что приготовим<br>сегодня?</h1><p>'+h(featured.description)+'</p><div class="actions">'+link('Открыть рецепт','recipe/'+featured.id,{kind:'primary',symbol:'arrow'})+button('Другое блюдо','random',{kind:'ghost',symbol:'spark'})+'</div></div>'+
     '<a class="hero-art" href="#/recipe/'+h(featured.id)+'">'+(featured.image==='dish:0'?'<div class="photo"><img class="local-photo" src="./images/pilaf.jpg" alt=""></div>':photo(featured.image,featured.name))+'<span class="hero-caption"><strong>'+h(featured.name)+'</strong><small>'+icon('time')+' '+totalTime(featured)+' мин</small></span></a></section>'+
     '<section><div class="section-heading"><h2>Ваш прогресс</h2>'+link('В дневник','history',{kind:'inline-action',symbol:'arrow'})+'</div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
-    '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'inline-action',symbol:'history'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
-    '<div class="panel mini home-plan"><div class="home-plan-heading"><div class="kicker">План готовки</div>'+
-    button('Открыть план','open-plan',{kind:'inline-action home-plan-open',symbol:'arrow'})+'</div>'+
+    '<section class="duo home-summary"><div class="panel home-last"><div class="home-summary-heading"><div class="kicker">Последнее блюдо</div>'+
+    (latest?link('В историю','history/'+h(latest.recipeId),{kind:'inline-action',symbol:'history'}):'')+'</div>'+
+    (latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>':
+      '<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
+    '<div class="panel home-plan"><div class="home-summary-heading"><div class="kicker">План готовки</div>'+
+    button('Открыть план','open-plan',{kind:'inline-action',symbol:'arrow'})+'</div>'+
     (planned.length?'<ul class="home-plan-list">'+planned.map(recipe=>'<li><a href="#/recipe/'+h(recipe.id)+'"><strong>'+
       h(recipe.name)+'</strong><small>'+h(recipe.category)+'</small></a></li>').join('')+'</ul>':
       '<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'inline-action',symbol:'arrow'}))+'</div></section>'+
