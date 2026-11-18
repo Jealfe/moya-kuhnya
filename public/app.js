@@ -98,7 +98,7 @@ function say(message,undo=false) {
   clearTimeout(noticeTimeout);
   notice.textContent=message;
   if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'inline-action',symbol:'back'}));
-  noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?10000:5500);
+  noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?5000:5500);
 }
 function showDialog(title,content,{sheet=false}={}) {
   dialog.classList.toggle('plan-sheet',sheet);

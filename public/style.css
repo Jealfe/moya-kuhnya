@@ -557,7 +557,7 @@ html {background:var(--bg)}
 .home-plan-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
 .home-plan-heading .kicker {margin:0}
 .home-plan-heading .home-plan-open {flex:none;min-height:44px;padding-inline:9px;border-radius:9px;font-size:.85rem}
-.home-plan-list {list-style:none;padding:0;margin:8px 0 0}
+.home-plan-list {list-style:none;padding:0;margin:0}
 .home-plan-list li {border-top:1px solid var(--line)}
 .home-plan-list a {display:grid;align-content:center;gap:3px;min-height:48px;padding:8px 0;color:var(--olive);overflow-wrap:anywhere}
 .home-plan-list strong {text-decoration:underline;text-underline-offset:3px}
