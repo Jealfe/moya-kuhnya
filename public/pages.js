@@ -21,8 +21,11 @@ export function home(state, recipes, featured) {
     '<a class="hero-art" href="#/recipe/'+h(featured.id)+'">'+(featured.image==='dish:0'?'<div class="photo"><img class="local-photo" src="./images/pilaf.jpg" alt=""></div>':photo(featured.image,featured.name))+'<span class="hero-caption"><strong>'+h(featured.name)+'</strong><small>'+icon('time')+' '+totalTime(featured)+' мин</small></span></a></section>'+
     '<section><div class="section-heading"><h2>Ваш прогресс</h2>'+link('В дневник','history',{kind:'quiet',symbol:'arrow'})+'</div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
     '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
-    '<div class="panel mini"><div class="kicker">План готовки</div>'+(planned.length?'<h3>'+dishCount(planned.length)+'</h3>'+
-      button('Открыть план','open-plan',{symbol:'arrow'}):'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
+    '<div class="panel mini home-plan"><div class="home-plan-heading"><div class="kicker">План готовки</div>'+
+    button('Открыть план','open-plan',{kind:'home-plan-open',symbol:'arrow'})+'</div>'+
+    (planned.length?'<ul class="home-plan-list">'+planned.map(recipe=>'<li><a href="#/recipe/'+h(recipe.id)+'"><strong>'+
+      h(recipe.name)+'</strong><small>'+h(recipe.category)+'</small></a></li>').join('')+'</ul>':
+      '<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
     '<section><div class="section-heading"><h2>Из каталога</h2>'+link('Все рецепты','recipes',{kind:'quiet',symbol:'arrow'})+'</div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
 }
 

@@ -54,6 +54,12 @@ try {
   await action('plan').click();
   await page.getByRole('button',{name:'Убрать из плана',exact:true}).waitFor();
   await go('home');
+  const homePlan=page.locator('.home-plan');
+  assert.equal(await homePlan.locator('.home-plan-list li').count(),2);
+  assert.equal(await homePlan.locator('.home-plan-list a[href="#/recipe/pilaf"] small').count(),1);
+  const heading=await homePlan.locator('.home-plan-heading').boundingBox();
+  const planButton=await action('open-plan').boundingBox();
+  assert.ok(Math.abs(heading.x+heading.width-planButton.x-planButton.width)<2);
   await action('open-plan').click();
   assert.equal(await page.locator('.cooking-plan li').count(),2);
   assert.equal(await page.locator('.cooking-plan a small').count(),2);
@@ -63,6 +69,7 @@ try {
   await page.locator('.shopping-group h2').first().waitFor();
   assert.equal(await page.locator('.shopping-group').count(),1);
   await go('home');
+  assert.equal(await homePlan.locator('.home-plan-list li').count(),2);
   await action('open-plan').click();
   await page.getByText(/Уже в списке/).waitFor();
   assert.equal(await page.locator('.cooking-plan li').filter({hasText:'Плов'}).getByRole('checkbox').isDisabled(),true);
@@ -142,6 +149,7 @@ try {
   await page.locator('.history-recipe-link').click();
   await page.waitForURL('**/#/recipe/pilaf');
   await go('home');
+  assert.equal(await homePlan.locator('.home-plan-list li').count(),1);
   await action('open-plan').click();
   assert.equal(await page.locator('.cooking-plan li').count(),1);
   await action('dialog-close').click();

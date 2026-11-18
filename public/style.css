@@ -554,6 +554,14 @@ html {background:var(--bg)}
 .cooking-plan a,.history-recipe-link {color:var(--olive);text-decoration:underline;text-underline-offset:4px}
 .cooking-plan a {padding:10px 0;overflow-wrap:anywhere}
 .cooking-plan a small {display:block;margin-top:3px;color:var(--muted);font-weight:500}
+.home-plan-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.home-plan-heading .kicker {margin:0}
+.home-plan-heading .home-plan-open {flex:none;min-height:44px;padding-inline:9px;border-radius:9px;font-size:.85rem}
+.home-plan-list {list-style:none;padding:0;margin:8px 0 0}
+.home-plan-list li {border-top:1px solid var(--line)}
+.home-plan-list a {display:grid;align-content:center;gap:3px;min-height:48px;padding:8px 0;color:var(--olive);overflow-wrap:anywhere}
+.home-plan-list strong {text-decoration:underline;text-underline-offset:3px}
+.home-plan-list small {color:var(--muted)}
 dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(100%,640px);max-height:88dvh;padding:0;
   border-radius:var(--radius) var(--radius) 0 0;display:flex;flex-direction:column;overflow:hidden}
 .plan-sheet .dialog-heading {padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}
