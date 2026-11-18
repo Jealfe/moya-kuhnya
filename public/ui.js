@@ -18,6 +18,9 @@ const paths = {
   heart:'M20 5a5 5 0 0 0-8 1 5 5 0 0 0-8-1c-2 2-2 5 0 7l8 8 8-8c2-2 2-5 0-7z',
   spark:'M12 2l2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8z',
   plus:'M12 4v16M4 12h16',
+  minus:'M5 12h14',
+  reset:'M5 4v6h6M5 10a8 8 0 1 1 0 6',
+  copy:'M9 9h11v11H9zM15 9V4H4v11h5',
   download:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   upload:'M12 15V3m-5 5 5-5 5 5M4 17v4h16v-4',
   check:'m4 12 5 5L20 6',
@@ -34,6 +37,8 @@ export const button = (label,action,{id='',kind='',symbol='',disabled=false}={})
   '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'" '+(disabled?'disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
 export const link = (label,route,{kind='',symbol=''}={}) =>
   '<a class="btn '+kind+'" href="#/'+route+'">'+(symbol?icon(symbol):'')+h(label)+'</a>';
+export const closeControl = attrs =>
+  '<button type="button" class="btn inline-action close-action" aria-label="Закрыть" '+attrs+'>'+icon('close')+'</button>';
 export const actionMenu = (label,actions,kind='') =>
   '<details class="recipe-add-menu '+kind+'"><summary class="btn" aria-label="'+h(label)+'">⋯</summary>'+
   '<div class="panel recipe-add-actions">'+actions+'</div></details>';

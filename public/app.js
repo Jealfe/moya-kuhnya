@@ -8,7 +8,7 @@ import { preparationTasks, reminderTime, stepNote, stepNoteKey } from './cooking
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
-import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
+import { area, button, clock, closeControl, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
 import { catalog, catalogMatches, catalogResults, cookPage, dishCount, goalLabels, historyPage, home, planSheet, planShoppingLabel, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
@@ -97,12 +97,12 @@ function saveReportDraft(form) {
 function say(message,undo=false) {
   clearTimeout(noticeTimeout);
   notice.textContent=message;
-  if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'quiet'}));
+  if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'inline-action',symbol:'back'}));
   noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?10000:5500);
 }
 function showDialog(title,content,{sheet=false}={}) {
   dialog.classList.toggle('plan-sheet',sheet);
-  dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+button('Закрыть','dialog-close',{kind:'quiet',symbol:'close'})+'</div>'+content;
+  dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+closeControl('data-do="dialog-close"')+'</div>'+content;
   if (!dialog.open) dialog.showModal();
 }
 const planRecipes = () => {
@@ -126,12 +126,13 @@ function showReviewReminder(id) {
     '<div data-custom-reminder '+(reminder?'':'hidden')+'>'+
     field('Дата и время',input('at',local,'type="datetime-local" '+(reminder?'required':'disabled')))+'</div>'+
     '<div class="actions"><button class="btn primary">Сохранить напоминание</button>'+
-    (reminder?button('Отменить напоминание','review-reminder-cancel',{id,kind:'quiet danger'}):'')+'</div>'+
+    (reminder?button('Отменить напоминание','review-reminder-cancel',{id,kind:'inline-action danger',symbol:'close'}):'')+'</div>'+
     '<p class="muted" data-reminder-status role="status" hidden></p>'+
     '<div data-review-settings hidden>'+button('Настройки уведомлений Android','timer-notification-settings')+'</div></form>');
 }
 function confirmAction(title,message,label,action,id='') {
-  showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+button('Отмена','dialog-close')+'</div>');
+  showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+
+    button('Отмена','dialog-close',{kind:'inline-action',symbol:'back'})+'</div>');
 }
 const showError = error => showDialog('Проверьте данные','<ul class="error-list">'+String(error.message || error).split('\n').map(line=>'<li>'+h(line)+'</li>').join('')+'</ul>'+
   (error.analysisResponse?'<details><summary>Показать ответ ИИ</summary><p class="muted">Этот ответ не сохранён как рекомендация. Его можно скопировать, чтобы разобраться с ошибкой.</p>'+area('ai-response',error.analysisResponse,'readonly rows="8" aria-label="Ответ ИИ"')+'</details>':''));
@@ -363,7 +364,8 @@ function importPreview(rows) {
     seen.add(recipe.id);
     return '<div class="import-row">'+photo(recipe.image,recipe.name)+'<div><h3>'+h(recipe.name)+'</h3><p>'+h(recipe.description)+'</p><p class="muted">'+h(recipe.category)+' · '+recipe.ingredients.length+' ингредиентов · '+recipe.steps.length+' шагов</p>'+
       (duplicate?field('Этот ID уже встречается',select('choice-'+index,[['copy','Создать копию'],['replace','Заменить'],['skip','Пропустить']],'copy')):'')+'</div></div>';
-  }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+button('Отмена','dialog-close')+'</div></form>');
+  }).join('')+'</div><div class="actions"><button class="btn primary">Добавить рецепты</button>'+
+    button('Отмена','dialog-close',{kind:'inline-action',symbol:'back'})+'</div></form>');
 }
 
 function updateGitHubButton() {
@@ -648,7 +650,7 @@ async function onAction(action,id) {
         '" data-step="'+session.step+'"><p>'+h(session.recipe.steps[session.step].title)+'</p>'+
         field('Заметка',area('note',note,'rows="4" maxlength="1200"'))+
         '<div class="actions"><button class="btn primary">Сохранить заметку</button>'+
-        (note?'<button class="btn quiet danger" name="remove" value="yes">Удалить заметку</button>':'')+'</div></form>');
+        (note?'<button class="btn inline-action danger" name="remove" value="yes">'+icon('minus')+'Удалить заметку</button>':'')+'</div></form>');
       return;
     }
     case 'cook-pause':

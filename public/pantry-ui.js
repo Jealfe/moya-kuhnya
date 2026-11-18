@@ -1,6 +1,6 @@
 
 import { matchRecipes, productCatalog, productKey, quickProducts, splitProducts, suggestProducts, updateProducts } from './pantry.js';
-import { area, h, icon } from './ui.js';
+import { area, closeControl, h, icon } from './ui.js';
 
 const editRoute='recipes/pantry';
 const resultsRoute='recipes/pantry-results';
@@ -187,7 +187,7 @@ export function createPantry(dialog,storage,initialPantry,onSaved) {
       }
       dialog.innerHTML='<div class="dialog-heading"><h2 id="pantry-title" tabindex="-1">'+
         (mode==='edit'?'Что есть дома?':'Подборка рецептов')+
-        '</h2><button class="btn quiet" type="button" data-pantry-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+        '</h2>'+closeControl('data-pantry-close')+'</div>'+
         (mode==='edit'?editContent():resultContent(eligible,{products,useBasics}));
       if (mode==='edit') refresh();
       if (!dialog.open) dialog.showModal();

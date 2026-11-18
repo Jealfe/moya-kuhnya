@@ -61,6 +61,23 @@ try {
   const planButton=await action('open-plan').boundingBox();
   assert.ok(Math.abs(heading.x+heading.width-planButton.x-planButton.width)<2);
   await action('open-plan').click();
+  const plan=page.getByRole('dialog',{name:'План готовки'});
+  const closePlan=plan.getByRole('button',{name:'Закрыть',exact:true});
+  const removeDish=plan.getByRole('button',{name:'Убрать',exact:true}).first();
+  assert.equal(await closePlan.textContent(),'');
+  assert.ok(await closePlan.evaluate(el=>{
+    const css=getComputedStyle(el);
+    return el.offsetWidth>=44 && el.offsetHeight>=44 && css.borderLeftWidth==='0px' && css.backgroundColor==='rgba(0, 0, 0, 0)';
+  }));
+  assert.ok(await removeDish.evaluate(el=>{
+    const css=getComputedStyle(el);
+    return css.borderLeftWidth==='1px' && css.borderTopWidth==='0px' &&
+      css.borderRightWidth==='0px' && css.backgroundColor==='rgba(0, 0, 0, 0)';
+  }));
+  assert.ok(await plan.locator('.plan-footer').evaluate(el=>el.lastElementChild.offsetTop>el.firstElementChild.offsetTop));
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await removeDish.evaluate(el=>getComputedStyle(el).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
   assert.equal(await page.locator('.cooking-plan li').count(),2);
   assert.equal(await page.locator('.cooking-plan a small').count(),2);
   await page.getByText(/Порций: 5/).waitFor();

@@ -1,5 +1,5 @@
 import { isAndroid } from './native.js';
-import { icon } from './ui.js';
+import { closeControl, icon } from './ui.js';
 
 export function installSelectMenus() {
   if (!isAndroid()) return;
@@ -37,12 +37,10 @@ export function installSelectMenus() {
       const title=document.createElement('h2');
       title.id='select-popup-title';
       title.textContent=label;
-      const close=document.createElement('button');
-      close.type='button';
-      close.className='btn quiet';
-      close.textContent='Закрыть';
+      header.append(title);
+      header.insertAdjacentHTML('beforeend',closeControl(''));
+      const close=header.querySelector('button');
       close.onclick=()=>popup.close();
-      header.append(title,close);
       const list=document.createElement('div');
       list.className='select-choices';
       for (const option of select.options) {

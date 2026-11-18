@@ -42,7 +42,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
       field('Тип доступа',select('ai-scope',[['GIGACHAT_API_PERS','Личный'],['GIGACHAT_API_B2B','Бизнес (B2B)'],['GIGACHAT_API_CORP','Корпоративный']],status.scope,disabled))+
       '<button class="btn primary" '+disabled+'>Сохранить настройки</button></form>'+
       '<div class="actions">'+button('Проверить подключение','ai-connect',{disabled:Boolean(disabled)||!status.hasKey})+
-      button('Удалить ключ','ai-delete-key',{disabled:Boolean(disabled)||!status.hasKey,kind:'quiet danger'})+'</div>'+
+      button('Удалить ключ','ai-delete-key',{disabled:Boolean(disabled)||!status.hasKey,kind:'inline-action danger',symbol:'minus'})+'</div>'+
       '<p role="status">'+h(settingsBusy?'Выполняется…':connectionStatus)+'</p><small>Ключ защищён Android Keystore и не включается в JSON-копии. После удаления приложения введите его заново. На устройстве с root-доступом абсолютная защита секретов невозможна.</small></section>';
   }
   function entryControls(entry) {
@@ -87,7 +87,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     if (!items.length) return '';
     const body='<ul class="ai-plan-list">'+items.slice(0,6).map(item=>'<li>'+h(item.text)+
       (item.stepIndexes.length?'<small>Шаги '+item.stepIndexes.map(index=>index+1).join(', ')+'</small>':'')+'</li>').join('')+'</ul>'+
-      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'});
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'inline-action',symbol:'arrow'});
     return compact?'<details class="panel padded ai-advice ai-plan"><summary>На что обратить внимание в этот раз <span aria-label="Активных советов: '+items.length+'">'+items.length+'</span></summary>'+body+'</details>':
       '<section class="panel padded ai-advice"><h2>На что обратить внимание в этот раз</h2>'+body+'</section>';
   }
@@ -95,7 +95,7 @@ export function createAi({getState,findRecipe,change,render,showDialog,showError
     const record=sessionAdvice?.recipeId===recipeId?sessionAdvice:null,items=adviceForStep(record,index);
     return items.length?'<section class="ai-advice ai-step" aria-label="Советы ИИ для текущего шага"><span class="kicker">Из прошлой готовки · ИИ</span><h3>На этом шаге обратите внимание</h3>'+items.map(item=>
       '<div class="ai-step-item"><strong>'+h(item.title)+'</strong><p>'+h(item.text)+'</p>'+feedbackButtons(record,item.issueIndex,item.recommendationIndex)+'</div>').join('')+
-      button('Весь разбор','ai-view',{id:record.entryId,kind:'quiet'})+'</section>':'';
+      button('Весь разбор','ai-view',{id:record.entryId,kind:'inline-action',symbol:'arrow'})+'</section>':'';
   }
   async function analyze(entryId,repeat=false) {
     if (busyEntry!==null||settingsBusy) return;

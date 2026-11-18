@@ -19,14 +19,14 @@ export function home(state, recipes, featured) {
   return '<div class="today">'+h(dateToday())+'</div>'+resume+
     '<section class="hero"><div class="hero-copy"><div class="kicker">'+icon('spark')+' Блюдо дня</div><h1>Что приготовим<br>сегодня?</h1><p>'+h(featured.description)+'</p><div class="actions">'+link('Открыть рецепт','recipe/'+featured.id,{kind:'primary',symbol:'arrow'})+button('Другое блюдо','random',{kind:'ghost',symbol:'spark'})+'</div></div>'+
     '<a class="hero-art" href="#/recipe/'+h(featured.id)+'">'+(featured.image==='dish:0'?'<div class="photo"><img class="local-photo" src="./images/pilaf.jpg" alt=""></div>':photo(featured.image,featured.name))+'<span class="hero-caption"><strong>'+h(featured.name)+'</strong><small>'+icon('time')+' '+totalTime(featured)+' мин</small></span></a></section>'+
-    '<section><div class="section-heading"><h2>Ваш прогресс</h2>'+link('В дневник','history',{kind:'quiet',symbol:'arrow'})+'</div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
-    '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
+    '<section><div class="section-heading"><h2>Ваш прогресс</h2>'+link('В дневник','history',{kind:'inline-action',symbol:'arrow'})+'</div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
+    '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'inline-action',symbol:'history'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
     '<div class="panel mini home-plan"><div class="home-plan-heading"><div class="kicker">План готовки</div>'+
-    button('Открыть план','open-plan',{kind:'home-plan-open',symbol:'arrow'})+'</div>'+
+    button('Открыть план','open-plan',{kind:'inline-action home-plan-open',symbol:'arrow'})+'</div>'+
     (planned.length?'<ul class="home-plan-list">'+planned.map(recipe=>'<li><a href="#/recipe/'+h(recipe.id)+'"><strong>'+
       h(recipe.name)+'</strong><small>'+h(recipe.category)+'</small></a></li>').join('')+'</ul>':
-      '<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
-    '<section><div class="section-heading"><h2>Из каталога</h2>'+link('Все рецепты','recipes',{kind:'quiet',symbol:'arrow'})+'</div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
+      '<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'inline-action',symbol:'arrow'}))+'</div></section>'+
+    '<section><div class="section-heading"><h2>Из каталога</h2>'+link('Все рецепты','recipes',{kind:'inline-action',symbol:'arrow'})+'</div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
 }
 
 const plurals=new Intl.PluralRules('ru');
@@ -37,7 +37,7 @@ export function planSheet(state,recipes,selected) {
   const existing=new Set(state.shoppingBatches.map(batch=>batch.recipeId));
   const count=recipes.filter(recipe=>!existing.has(recipe.id) && (!selected || selected.has(recipe.id))).length;
   if (!recipes.length) return '<p>В плане пока пусто.</p>'+link('К рецептам','recipes',{kind:'primary'});
-  return '<form id="plan-shopping-form" class="plan-form"><div class="plan-scroll"><p class="muted">Выберите блюда, для которых нужны покупки.</p>'+
+  return '<form id="plan-shopping-form" class="plan-form"><div class="plan-scroll"><p class="muted">Выберите блюда для покупок.</p>'+
     '<ul class="cooking-plan">'+recipes.map(recipe=>{
       const id=h(recipe.id);
       const already=existing.has(recipe.id);
@@ -45,9 +45,9 @@ export function planSheet(state,recipes,selected) {
       return '<li><input type="checkbox" name="recipe" value="'+id+'" aria-label="Выбрать для покупок: '+h(recipe.name)+'" '+
         (already?'disabled':checked?'checked':'')+'><a href="#/recipe/'+id+'">'+h(recipe.name)+'<small>'+h(recipe.category)+
         ' · Порций: '+plannedServings(state,recipe)+(already?' · Уже в списке':'')+'</small></a>'+
-        button('Убрать','plan-sheet-remove',{id:recipe.id,kind:'quiet'})+'</li>';
+        button('Убрать','plan-sheet-remove',{id:recipe.id,kind:'inline-action plan-remove',symbol:'minus'})+'</li>';
     }).join('')+'</ul></div><div class="plan-footer"><button class="btn primary" data-plan-submit '+(!count?'disabled':'')+'>'+
-    planShoppingLabel(count)+'</button>'+link('К покупкам','shopping',{kind:'quiet'})+'</div></form>';
+    planShoppingLabel(count)+'</button><a class="btn inline-action" href="#/shopping">К покупкам'+icon('arrow')+'</a></div></form>';
 }
 
 export const quickFilterLabels = {quick20:'До 20 минут',noOven:'Без духовки',onePan:'В одной сковороде'};
@@ -64,7 +64,7 @@ export function catalog(recipes,filters,checkingGitHub) {
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
-    '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+button('Сбросить фильтры','reset-filters',{kind:'quiet'})+'</div>'+
+    '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+button('Сбросить фильтры','reset-filters',{kind:'inline-action',symbol:'reset'})+'</div>'+
     '<details class="quick-filters" '+(quickCount?'open':'')+'><summary class="btn">Быстрые фильтры<span data-quick-count>'+
     (quickCount?' · '+quickCount:'')+'</span></summary><div class="quick-filter-options">'+
     Object.entries(quickFilterLabels).map(([key,label])=>'<label class="toggle"><input type="checkbox" name="'+key+'" '+
@@ -98,7 +98,7 @@ export function recipePage(state,recipe,servings,preview=false,fromPantry=false,
   const heart=preview?'':'<button type="button" class="favorite '+(favorite?'selected':'')+
     '" data-do="favorite" data-id="'+h(recipe.id)+'" aria-label="Избранное" aria-pressed="'+favorite+'">'+icon('heart')+'</button>';
   const top=preview?'':'<div class="recipe-topbar">'+link(fromPantry?'К подборке':'Все рецепты',
-    fromPantry?'recipes/pantry-results':'recipes',{kind:'quiet',symbol:'back'})+
+    fromPantry?'recipes/pantry-results':'recipes',{kind:'inline-action',symbol:'back'})+
     '<details class="recipe-add-menu detail-menu"><summary class="btn quiet" aria-label="Действия с рецептом"><span aria-hidden="true">⋯</span></summary>'+
     '<div class="panel recipe-add-actions">'+link('Редактировать рецепт','editor/'+recipe.id)+'</div></details></div>';
   const portionControl='<div class="portion-control">'+
@@ -116,7 +116,7 @@ export function recipePage(state,recipe,servings,preview=false,fromPantry=false,
     '<section class="panel padded"><h2>План приготовления</h2><ol class="steps">'+recipe.steps.map(step=>'<li><details><summary>'+h(step.title)+'</summary><p>'+h(step.instruction)+'</p>'+(step.temperature?'<p class="muted">'+h(step.temperature)+'</p>':'')+'</details></li>').join('')+'</ol>'+
     (recipe.tips.length?'<h3>Советы</h3>'+list(recipe.tips):'')+(recipe.mistakes.length?'<h3>Частые ошибки</h3>'+list(recipe.mistakes):'')+
     (recipe.source?'<p class="recipe-source">Источник для сверки · <a href="'+h(recipe.source.url)+'" target="_blank" rel="noopener noreferrer">'+h(recipe.source.title)+'</a></p>':'')+'</section></div>'+
-    (history.length&&!preview?'<section class="panel padded"><div class="section-heading"><h2>Последние заметки</h2>'+link('Сравнить попытки','history/'+recipe.id,{kind:'quiet'})+'</div>'+notes(history[0])+(notes(history[0])?'':'<p class="muted">К последней попытке заметок нет.</p>')+'</section>':'');
+    (history.length&&!preview?'<section class="panel padded"><div class="section-heading"><h2>Последние заметки</h2>'+link('Сравнить попытки','history/'+recipe.id,{kind:'inline-action',symbol:'arrow'})+'</div>'+notes(history[0])+(notes(history[0])?'':'<p class="muted">К последней попытке заметок нет.</p>')+'</section>':'');
 }
 
 export function timerCard(timer, template) {
@@ -147,7 +147,7 @@ export function cookPage(state,reportDraft,ai=null) {
     const saved=session.timers.find(item=>item.id===id);
     return timerCard(saved?{...saved,saved:true}:{id,name:timer.name,duration:timer.seconds,remaining:timer.seconds,end:null},true);
   }).join('');
-  return link('К рецепту','recipe/'+recipe.id,{kind:'quiet',symbol:'back'})+
+  return link('К рецепту','recipe/'+recipe.id,{kind:'inline-action',symbol:'back'})+
     heading(recipe.name,servings+' порций · '+done.length+' из '+recipe.steps.length+' шагов отмечено',
       button(session.activeSince===null?'Продолжить':'Пауза готовки','cook-pause',{symbol:session.activeSince===null?'arrow':'pause'}))+
     (session.activeSince===null?'<div class="info">Готовка на паузе. Уже запущенные таймеры продолжают отсчёт.</div>':'')+
@@ -161,20 +161,21 @@ export function cookPage(state,reportDraft,ai=null) {
     (step.temperature?'<div class="info">'+h(step.temperature)+'</div>':'')+(step.ready?'<div class="note"><strong>Как понять, что готово</strong><p>'+h(step.ready)+'</p></div>':'')+
     (step.parallel?'<div class="note"><strong>Параллельно</strong><p>'+h(step.parallel)+'</p></div>':'')+
     '<div class="step-personal-note">'+(personalNote?'<div class="note"><strong>Моя заметка</strong><p>'+h(personalNote)+'</p></div>':'')+
-    button(personalNote?'Изменить заметку':'Добавить заметку','step-note',{symbol:'edit',kind:'quiet'})+'</div>'+
+    button(personalNote?'Изменить заметку':'Добавить заметку','step-note',{symbol:'edit',kind:'inline-action'})+'</div>'+
     (ai?.questionButton()?'<div class="step-ai-actions">'+ai.questionButton()+'</div>':'')+(timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+
     (notes(previous)?'<h3>Из прошлой попытки</h3>'+notes(previous):'')+'</aside></div>'+
     '<div class="actions cook-actions">'+button('Назад','cook-step',{id:index-1,disabled:index===0,symbol:'back'})+
     button(done.includes(index)?'Снять отметку':'Отметить шаг','cook-check')+
     (index===recipe.steps.length-1?button('Завершить готовку','cook-finish',{kind:'primary',symbol:'check'}):button('Далее','cook-step',{id:index+1,kind:'primary',symbol:'arrow'}))+'</div>'+
-    '<p class="muted timer-help">'+(isAndroid()?'Для сигнала на заблокированном экране включите уведомления и точные сигналы в настройках приложения.':'После закрытия страницы сигнал может не прозвучать.')+'</p>'+button('Отменить готовку','cook-cancel',{kind:'quiet danger'});
+    '<p class="muted timer-help">'+(isAndroid()?'Для сигнала на заблокированном экране включите уведомления и точные сигналы в настройках приложения.':'После закрытия страницы сигнал может не прозвучать.')+'</p>'+button('Отменить готовку','cook-cancel',{kind:'inline-action danger',symbol:'close'});
 }
 
 const impressionLabel = entry => entry.pending?'Оценка отложена':ratingLabel(entry.rating);
 export function reportPage(entry,draft,legacy=false,reminder=null,canRemind=false) {
   const values={...entry,...draft};
-  const later=legacy?button('Оценить позже','report-defer',{id:entry.id}):link(entry.pending?'Оценить позже':'В историю','history/'+entry.recipeId,{kind:'quiet'});
+  const later=legacy?button('Оценить позже','report-defer',{id:entry.id,kind:'inline-action',symbol:'time'}):
+    link(entry.pending?'Оценить позже':'В историю','history/'+entry.recipeId,{kind:'inline-action',symbol:entry.pending?'time':'arrow'});
   return heading(!legacy&&!entry.pending?'Редактировать отзыв':'Как получилось?',entry.name,later)+
     (entry.pending && canRemind?'<div class="info review-reminder">'+(reminder?'<p>Напоминание · '+
       h(dateLabel(reminder.at))+'</p>':'')+button(reminder?'Изменить напоминание':'Напомнить об отзыве','review-reminder',{id:entry.id,symbol:'time'})+'</div>':'')+
@@ -207,7 +208,7 @@ export function shoppingPage(state) {
   const totals=shoppingTotals(sections);
   const count=totals.length;
   return heading('Покупки',sections.length?'Осталось купить: '+count:'Добавьте продукты из рецепта или внесите свои.',
-    button('Добавить продукт','shop-add',{kind:'primary',symbol:'plus'})+button('Копировать','shop-copy',{disabled:!sections.length}))+
+    button('Добавить продукт','shop-add',{kind:'primary',symbol:'plus'})+button('Копировать','shop-copy',{disabled:!sections.length,kind:'inline-action',symbol:'copy'}))+
     (!sections.length?empty('Список пока пуст','Откройте рецепт и добавьте продукты в покупки.',link('К рецептам','recipes',{kind:'primary'})):
     (sections.length>1 && count?'<section class="panel padded shopping-summary"><h2>Общий итог покупок</h2>'+
       totals.map(item=>'<details><summary><span>'+h(item.name)+'</span><strong>'+h(amount(item))+'</strong></summary><ul>'+
@@ -215,7 +216,7 @@ export function shoppingPage(state) {
           h(amount(part))+'</strong></li>').join('')+'</ul></details>').join('')+'</section>':'')+
     sections.map(section=>'<section class="panel padded shopping-group"><div class="section-heading"><div><h2>'+h(section.name)+'</h2>'+
       (section.id?'<p class="muted">Порций: '+section.servings+'</p>':'<p class="muted">Отдельные продукты</p>')+'</div>'+
-      (section.id?button('Удалить блюдо','shop-batch-delete',{id:section.id,kind:'quiet danger'}):'')+'</div>'+
+      (section.id?button('Удалить блюдо','shop-batch-delete',{id:section.id,kind:'inline-action danger',symbol:'minus'}):'')+'</div>'+
       shoppingGroups(section.items.filter(item=>item.state!=='home'))+'</section>').join('')+
     (atHome.length?'<section class="panel padded shopping-at-home"><h2>Есть дома</h2>'+shoppingGroups(atHome)+'</section>':''));
 }
@@ -228,10 +229,10 @@ export function historyPage(state,recipeId,period,ai=null,findRecipe,canRemind=f
   const stats=statistics(history);
   const points=activity(history,period);
   const chartMax=Math.max(1,...points.map(point=>point.count));
-  return (recipeId?link('Весь дневник','history',{kind:'quiet',symbol:'back'}):'')+
+  return (recipeId?link('Весь дневник','history',{kind:'inline-action',symbol:'back'}):'')+
     heading(recipeId?(entries[0]?.name??'Попытки'):'Кулинарный дневник',recipeId?'Сравните оценки, фотографии и заметки.':'Следите за практикой и сохраняйте наблюдения.',
       recipeId?'':button('Настроить цели','goals',{symbol:'trend'}))+
-    (pending.length?'<div class="info pending-impressions">'+(pending.length===1?'Ждёт оценки: '+h(pending[0].name):'Блюд ждут оценки: '+pending.length)+link('Оценить','impression/'+pending[0].id,{kind:'quiet'})+'</div>':'')+
+    (pending.length?'<div class="info pending-impressions">'+(pending.length===1?'Ждёт оценки: '+h(pending[0].name):'Блюд ждут оценки: '+pending.length)+link('Оценить','impression/'+pending[0].id,{kind:'inline-action',symbol:'edit'})+'</div>':'')+
     (recipeId?'':'<div class="stats four">'+stat('Всего',stats.total,'bowl')+stat('Уникальных блюд',stats.unique,'recipes')+stat('Повторных попыток',stats.repeats,'history')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div>'+
       '<div class="duo"><section class="panel padded"><div class="section-heading activity-heading"><h2>Активность</h2>'+select('period',[['week','По неделям'],['month','По месяцам']],period,'aria-label="Период активности"')+'</div><div class="chart">'+points.map(point=>'<div><strong>'+point.count+'</strong><span class="bar" style="--bar:'+Math.max(3,point.count/chartMax*100)+'%"></span><small>'+h(point.label)+'</small></div>').join('')+'</div></section>'+
       '<section class="panel padded"><h2>Цели на месяц</h2>'+Object.entries(goalLabels).map(([key,label])=>state.goals[key]?'<label class="goal"><span>'+label+'</span><strong>'+stats[key]+' / '+state.goals[key]+'</strong><progress value="'+Math.min(stats[key],state.goals[key])+'" max="'+state.goals[key]+'"></progress></label>':'').join('')+(Object.values(state.goals).some(Boolean)?'':'<p class="muted">Установите свою первую цель.</p>')+'</section></div>'+
@@ -241,8 +242,8 @@ export function historyPage(state,recipeId,period,ai=null,findRecipe,canRemind=f
     (findRecipe?.(entry.recipeId)?'<a class="history-recipe-link" href="#/recipe/'+h(entry.recipeId)+'">'+h(entry.name)+'</a>':h(entry.name))+'</h3>'+
     '<div class="pills"><span>'+icon('star')+' '+impressionLabel(entry)+'</span><span>'+entry.minutes+' мин</span>'+(entry.again?'<span>'+(entry.again==='yes'?'Хочу повторить':'Не хочу повторять')+'</span>':'')+'</div>'+
     notes(entry)+(ai?.entryControls(entry)??'')+'<div class="entry-footer">'+
-    link(entry.pending?'Оценить':'Править','impression/'+entry.id,{kind:entry.pending?'primary':'entry-footer-link',symbol:'edit'})+
-    (recipeId?'':link('Все попытки','history/'+entry.recipeId,{kind:'entry-footer-link',symbol:'arrow'}))+
+    link(entry.pending?'Оценить':'Править','impression/'+entry.id,{kind:entry.pending?'primary':'inline-action entry-footer-link',symbol:'edit'})+
+    (recipeId?'':link('Все попытки','history/'+entry.recipeId,{kind:'inline-action entry-footer-link',symbol:'arrow'}))+
     '<details class="recipe-add-menu entry-menu"><summary class="btn" aria-label="Действия с записью">⋯</summary>'+
     '<div class="panel recipe-add-actions">'+(entry.pending && canRemind?
       button(state.reviewReminders?.some(reminder=>reminder.entryId===entry.id)?'Изменить напоминание':'Напомнить об отзыве','review-reminder',{id:entry.id,symbol:'time'}):'')+
