@@ -67,11 +67,13 @@ export function catalog(recipes,filters,checkingGitHub) {
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
-    '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+button('Сбросить фильтры','reset-filters',{kind:'inline-action',symbol:'reset'})+'</div>'+
-    '<details class="quick-filters" '+(quickCount?'open':'')+'><summary class="btn">Быстрые фильтры<span data-quick-count>'+
-    (quickCount?' · '+quickCount:'')+'</span></summary><div class="quick-filter-options">'+
+    '<div class="filter-actions"><div class="filter-shortcuts"><label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+
+    '<details class="quick-filters"><summary class="btn" aria-label="Быстрые фильтры" title="Быстрые фильтры">'+icon('filters')+
+    '<span data-quick-count aria-hidden="true" '+(quickCount?'':'hidden')+'>'+quickCount+'</span></summary>'+
+    '<div class="panel quick-filter-options"><strong>Быстрые фильтры</strong>'+
     Object.entries(quickFilterLabels).map(([key,label])=>'<label class="toggle"><input type="checkbox" name="'+key+'" '+
-      (filters[key]?'checked':'')+'> '+label+'</label>').join('')+'</div></details></form>'+
+      (filters[key]?'checked':'')+'> '+label+'</label>').join('')+'</div></details></div>'+
+    button('Сбросить','reset-filters',{kind:'inline-action',symbol:'reset',ariaLabel:'Сбросить фильтры'})+'</div></div></form>'+
     '<div class="catalog-options"><p id="recipe-count" class="muted" aria-live="polite"></p>'+
     link('Что есть дома?','recipes/pantry',{symbol:'bowl'})+'</div><div id="recipe-results" class="cards"></div>';
 }
@@ -87,7 +89,12 @@ export function catalogMatches(state,recipes,filters) {
 export function catalogResults(state,recipes,filters) {
   const matches=catalogMatches(state,recipes,filters);
   const quickCount=Object.keys(quickFilterLabels).filter(key=>filters[key]).length;
-  document.querySelector('[data-quick-count]').textContent=quickCount?' · '+quickCount:'';
+  const badge=document.querySelector('[data-quick-count]');
+  badge.textContent=quickCount;
+  badge.hidden=!quickCount;
+  const summary=badge.closest('summary');
+  if (quickCount) summary.setAttribute('aria-description','Включено: '+quickCount);
+  else summary.removeAttribute('aria-description');
   document.querySelector('#recipe-count').textContent='Найдено: '+matches.length;
   document.querySelector('#recipe-results').innerHTML=matches.length?matches.map(recipe=>card(recipe,state)).join(''):empty('Ничего не найдено','Попробуйте изменить поиск или фильтры.');
 }

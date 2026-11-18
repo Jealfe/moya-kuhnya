@@ -736,7 +736,7 @@ async function run(work) {
 }
 
 document.addEventListener('click',event=>{
-  for (const menu of document.querySelectorAll('.recipe-add-menu[open]')) {
+  for (const menu of document.querySelectorAll('.recipe-add-menu[open],.quick-filters[open]')) {
     if (!menu.contains(event.target)) menu.open=false;
   }
   if (event.target.closest('.skip')) {
@@ -759,7 +759,7 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('keydown',event=>{
   if (event.key!=='Escape' || dialog.open || pantryDialog.open) return;
-  const menu=document.querySelector('.recipe-add-menu[open],.detail-menu[open]');
+  const menu=document.querySelector('.recipe-add-menu[open],.quick-filters[open]');
   if (menu) {
     menu.open=false;
     menu.querySelector('summary').focus();

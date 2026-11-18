@@ -580,11 +580,18 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
 .shopping-summary summary span {flex:1}
 .shopping-summary strong {flex:none}
 .shopping-summary ul {margin:0 0 8px;padding:0 0 0 20px;color:var(--muted)}
-.quick-filters summary {min-height:44px;width:max-content;max-width:100%;cursor:pointer}
-.quick-filters summary::after {content:'▾';margin-inline-start:4px}
-.quick-filters[open] summary::after {content:'▴'}
-.quick-filter-options {display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:7px}
-.quick-filter-options label {min-height:44px}
+.filter-actions {display:flex;align-items:center;gap:6px;flex:1 1 100%}
+.filter-actions>.btn.inline-action {gap:5px;padding-inline:4px;font-size:.85rem}
+.filter-shortcuts {display:flex;align-items:center;gap:6px;position:relative}
+.quick-filters>summary {width:44px;min-width:44px;min-height:44px;padding:0;position:relative;cursor:pointer;list-style:none;
+  background:var(--chip);color:var(--olive);border:0;border-radius:8px}
+.quick-filters>summary::-webkit-details-marker {display:none}
+.quick-filters[open]>summary {background:var(--raised)}
+[data-quick-count]:not([hidden]) {display:grid;place-items:center;position:absolute;inset:2px 2px auto auto;min-width:17px;
+  height:17px;padding-inline:3px;border-radius:50%;background:var(--brand);color:var(--on-brand);font-size:11px}
+.quick-filter-options {display:grid;position:absolute;inset:calc(100% + 6px) auto auto 0;z-index:5;width:215px;padding:10px 12px 5px}
+.quick-filter-options>strong {padding-block:3px 5px}
+.quick-filter-options .toggle {min-height:44px}
 .prep-checklist {padding:0 14px;margin:0 0 12px}
 .prep-checklist summary {min-height:48px;padding:12px 0;cursor:pointer;font-weight:650}
 .prep-checklist summary small {margin-left:8px;color:var(--muted)}
@@ -701,8 +708,13 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
 .btn.inline-action:active:not(:disabled),.btn.inline-action:focus-visible {
   background:transparent;box-shadow:none
 }
+@property --action-glow-strength {
+  syntax:"<percentage>";
+  inherits:false;
+  initial-value:24%;
+}
 .btn.inline-action:not(:disabled,.close-action) {
-  text-shadow:0 0 3px color-mix(in srgb,currentColor 27%,transparent)
+  text-shadow:0 0 5px color-mix(in srgb,currentColor var(--action-glow-strength,24%),transparent)
 }
 [data-theme=light] .btn.inline-action:not(:disabled,.close-action) {
   text-shadow:0 0 3px color-mix(in srgb,currentColor 15%,transparent)
@@ -712,9 +724,9 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
   .plan-sheet .cooking-plan a:hover {text-decoration:underline}
 }
 @media(prefers-reduced-motion:no-preference) {
-  :root:not([data-theme=light]) .btn.inline-action:not(:disabled,.close-action) {animation:inline-text-glow 3.4s ease-in-out infinite alternate}
+  :root:not([data-theme=light]) .btn.inline-action:not(:disabled,.close-action) {animation:inline-text-glow 7s ease-in-out infinite alternate}
   @keyframes inline-text-glow {
-    from {text-shadow:0 0 3px color-mix(in srgb,currentColor 27%,transparent)}
-    to {text-shadow:0 0 7px color-mix(in srgb,currentColor 55%,transparent)}
+    from {--action-glow-strength:24%}
+    to {--action-glow-strength:39%}
   }
 }

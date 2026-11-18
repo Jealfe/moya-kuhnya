@@ -28,17 +28,29 @@ try {
   assert.notEqual(await featured.getAttribute('href'),firstFeatured);
   await go('recipes');
   const search=page.getByRole('searchbox');
+  const quickMenu=page.locator('.quick-filters');
+  const quickButton=quickMenu.locator('summary');
+  const favorite=page.getByLabel('Избранное',{exact:true});
   await search.fill('плов');
-  await page.getByLabel('Избранное',{exact:true}).check();
-  await page.locator('.quick-filters > summary').click();
+  await favorite.check();
+  const buttonBox=await quickButton.boundingBox();
+  const favoriteBox=await favorite.boundingBox();
+  const resetBox=await action('reset-filters').boundingBox();
+  assert.ok(buttonBox.width===44 && Math.abs(buttonBox.y-resetBox.y)<1 &&
+    favoriteBox.y>=buttonBox.y && favoriteBox.y+favoriteBox.height<=buttonBox.y+buttonBox.height);
+  await quickButton.click();
   const quick=page.getByLabel('До 20 минут',{exact:true});
   const onePan=page.getByLabel('В одной сковороде',{exact:true});
   await quick.check();
+  assert.equal(await quickMenu.locator('[data-quick-count]').textContent(),'1');
+  await page.keyboard.press('Escape');
+  assert.equal(await quickMenu.evaluate(el=>el.open),false);
   await action('reset-filters').click();
   assert.equal(await search.inputValue(),'');
-  assert.equal(await page.getByLabel('Избранное',{exact:true}).isChecked(),false);
+  assert.equal(await favorite.isChecked(),false);
   assert.equal(await quick.isChecked(),false);
-  await page.locator('.quick-filters > summary').click();
+  assert.equal(await quickMenu.locator('[data-quick-count]').isVisible(),false);
+  await quickButton.click();
   await onePan.check();
   await search.fill('шакшука');
   await page.locator('#recipe-results .recipe-card').waitFor();
@@ -80,6 +92,15 @@ try {
   assert.notEqual(await removeDish.evaluate(el=>getComputedStyle(el).textShadow),'none');
   await page.emulateMedia({reducedMotion:'no-preference'});
   assert.equal(await removeDish.evaluate(el=>getComputedStyle(el).animationIterationCount),'infinite');
+  const glow=await removeDish.evaluate(el=>{
+    const animation=el.getAnimations().find(effect=>effect.animationName==='inline-text-glow');
+    animation.pause();
+    return [0,1750,3500,5250,7000,8750].map(time=>{
+      animation.currentTime=time;
+      return parseFloat(getComputedStyle(el).getPropertyValue('--action-glow-strength'));
+    });
+  });
+  assert.ok(glow.slice(1,5).every((value,index)=>value>glow[index]) && glow[5]<glow[4] && glow[5]>glow[2]);
   assert.equal(await page.locator('.cooking-plan li').count(),2);
   assert.equal(await page.locator('.cooking-plan a small').count(),2);
   await page.getByText(/Порций: 5/).waitFor();

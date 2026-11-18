@@ -25,6 +25,7 @@ const paths = {
   upload:'M12 15V3m-5 5 5-5 5 5M4 17v4h16v-4',
   check:'m4 12 5 5L20 6',
   search:'M10 4a6 6 0 1 0 .01 0M15 15l5 5',
+  filters:'M4 6h16M4 12h16M4 18h16M10 3v6m5 0v6m-8 0v6',
   bowl:'M3 12h18a9 9 0 0 1-18 0zm5 9h8M8 8c-2-2 1-3 0-5m5 5c-2-2 1-3 0-5',
   trend:'m3 16 6-6 4 4 7-8m-5 0h5v5',
   star:'m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.4-5.7-3-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z',
@@ -33,8 +34,9 @@ const paths = {
   pause:'M9 4v16m6-16v16'
 };
 export const icon = name => '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[name]+'"/></svg>';
-export const button = (label,action,{id='',kind='',symbol='',disabled=false}={}) =>
-  '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'" '+(disabled?'disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
+export const button = (label,action,{id='',kind='',symbol='',disabled=false,ariaLabel=''}={}) =>
+  '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'"'+
+  (ariaLabel?' aria-label="'+h(ariaLabel)+'"':'')+(disabled?' disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
 export const link = (label,route,{kind='',symbol=''}={}) =>
   '<a class="btn '+kind+'" href="#/'+route+'">'+(symbol?icon(symbol):'')+h(label)+'</a>';
 export const closeControl = attrs =>
