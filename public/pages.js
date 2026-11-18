@@ -1,5 +1,6 @@
 import { isAndroid } from './native.js';
-import { plannedIds, activity, amount, duration, formatNumber, ordered, remaining, scaled, shoppingSections, statistics, totalTime } from './core.js';
+import { plannedIds, plannedServings, activity, amount, duration, formatNumber, ordered, remaining, scaled, shoppingSections, shoppingTotals, statistics, totalTime } from './core.js';
+import { matchesQuickFilters, preparationTasks, stepNote } from './cooking-extras.js';
 import { actionMenu, area, button, card, clock, dateLabel, empty, field, foodList, h, heading, icon, input, link, list, photo, ratingLabel, select, stat, statusFor, statusLabels } from './ui.js';
 
 const start = recipe => button('Начать готовить','start',{id:recipe.id,kind:'primary start-cooking',symbol:'arrow'});
@@ -20,13 +21,36 @@ export function home(state, recipes, featured) {
     '<a class="hero-art" href="#/recipe/'+h(featured.id)+'">'+(featured.image==='dish:0'?'<div class="photo"><img class="local-photo" src="./images/pilaf.jpg" alt=""></div>':photo(featured.image,featured.name))+'<span class="hero-caption"><strong>'+h(featured.name)+'</strong><small>'+icon('time')+' '+totalTime(featured)+' мин</small></span></a></section>'+
     '<section><div class="section-heading"><h2>Ваш прогресс</h2>'+link('В дневник','history',{kind:'quiet',symbol:'arrow'})+'</div><div class="stats">'+stat('Приготовлений',stats.total,'bowl')+stat('Рецептов освоено',mastered,'check')+stat('Средняя оценка',stats.average?formatNumber(stats.average):'—','star')+'</div></section>'+
     '<section class="duo"><div class="panel mini"><div class="kicker">Последнее блюдо</div>'+(latest?'<h3>'+h(latest.name)+'</h3><p>'+h(impressionLabel(latest))+' · '+h(dateLabel(latest.at))+'</p>'+link('Открыть историю','history/'+h(latest.recipeId),{kind:'quiet'}):'<p>Здесь появится первая запись о готовке.</p>')+'</div>'+
-    '<div class="panel mini"><div class="kicker">План готовки</div>'+(planned.length?'<ul class="cooking-plan">'+planned.map(recipe=>'<li>'+
-      '<a href="#/recipe/'+h(recipe.id)+'">'+h(recipe.name)+'<small>'+h(recipe.category)+'</small></a>'+button('Убрать','plan',{id:recipe.id,kind:'quiet'})+'</li>').join('')+'</ul>':'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
+    '<div class="panel mini"><div class="kicker">План готовки</div>'+(planned.length?'<h3>'+dishCount(planned.length)+'</h3>'+
+      button('Открыть план','open-plan',{symbol:'arrow'}):'<p>Выберите блюдо и добавьте его в план.</p>'+link('Посмотреть рецепты','recipes',{kind:'quiet'}))+'</div></section>'+
     '<section><div class="section-heading"><h2>Из каталога</h2>'+link('Все рецепты','recipes',{kind:'quiet',symbol:'arrow'})+'</div><div class="cards">'+['roast-chicken','syrniki','bolognese'].map(id=>recipes.find(recipe=>recipe.id===id)).filter(Boolean).map(recipe=>card(recipe,state)).join('')+'</div></section>';
 }
 
+const plurals=new Intl.PluralRules('ru');
+export const dishCount = count => count+' '+({one:'блюдо',few:'блюда',many:'блюд'}[plurals.select(count)]??'блюд');
+export const planShoppingLabel = count => count?'Добавить в покупки · '+dishCount(count):'Добавить в покупки';
+
+export function planSheet(state,recipes,selected) {
+  const existing=new Set(state.shoppingBatches.map(batch=>batch.recipeId));
+  const count=recipes.filter(recipe=>!existing.has(recipe.id) && (!selected || selected.has(recipe.id))).length;
+  if (!recipes.length) return '<p>В плане пока пусто.</p>'+link('К рецептам','recipes',{kind:'primary'});
+  return '<form id="plan-shopping-form" class="plan-form"><div class="plan-scroll"><p class="muted">Выберите блюда, для которых нужны покупки.</p>'+
+    '<ul class="cooking-plan">'+recipes.map(recipe=>{
+      const id=h(recipe.id);
+      const already=existing.has(recipe.id);
+      const checked=!already && (!selected || selected.has(recipe.id));
+      return '<li><input type="checkbox" name="recipe" value="'+id+'" aria-label="Выбрать для покупок: '+h(recipe.name)+'" '+
+        (already?'disabled':checked?'checked':'')+'><a href="#/recipe/'+id+'">'+h(recipe.name)+'<small>'+h(recipe.category)+
+        ' · Порций: '+plannedServings(state,recipe)+(already?' · Уже в списке':'')+'</small></a>'+
+        button('Убрать','plan-sheet-remove',{id:recipe.id,kind:'quiet'})+'</li>';
+    }).join('')+'</ul></div><div class="plan-footer"><button class="btn primary" data-plan-submit '+(!count?'disabled':'')+'>'+
+    planShoppingLabel(count)+'</button>'+link('К покупкам','shopping',{kind:'quiet'})+'</div></form>';
+}
+
+export const quickFilterLabels = {quick20:'До 20 минут',noOven:'Без духовки',onePan:'В одной сковороде'};
 export function catalog(recipes,filters,checkingGitHub) {
   const categories=[...new Set(recipes.map(recipe=>recipe.category))];
+  const quickCount=Object.keys(quickFilterLabels).filter(key=>filters[key]).length;
   return '<div class="catalog-title"><h1>Рецепты</h1><details class="recipe-add-menu">'+
     '<summary class="btn quiet" aria-label="Действия с рецептами" title="Действия с рецептами"><span aria-hidden="true">⋯</span></summary><div class="panel recipe-add-actions">'+
     link('Новый рецепт','editor',{symbol:'plus'})+button('Импорт','import',{symbol:'upload'})+
@@ -37,18 +61,27 @@ export function catalog(recipes,filters,checkingGitHub) {
     field('Сложность',select('difficulty',[['','Любая'],...[1,2,3,4,5].map(n=>[n,n+' / 5'])],filters.difficulty))+
     field('Время',select('time',[['','Любое'],[30,'До 30 мин'],[60,'До 60 мин'],[90,'До 90 мин']],filters.time))+
     field('Статус',select('status',[['','Все'],...Object.entries(statusLabels)],filters.status))+
-    '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+button('Сбросить фильтры','reset-filters',{kind:'quiet'})+'</div></form>'+
+    '<label class="toggle"><input type="checkbox" name="favorite" '+(filters.favorite?'checked':'')+'> Избранное</label>'+button('Сбросить фильтры','reset-filters',{kind:'quiet'})+'</div>'+
+    '<details class="quick-filters" '+(quickCount?'open':'')+'><summary class="btn">Быстрые фильтры<span data-quick-count>'+
+    (quickCount?' · '+quickCount:'')+'</span></summary><div class="quick-filter-options">'+
+    Object.entries(quickFilterLabels).map(([key,label])=>'<label class="toggle"><input type="checkbox" name="'+key+'" '+
+      (filters[key]?'checked':'')+'> '+label+'</label>').join('')+'</div></details></form>'+
     '<div class="catalog-options"><p id="recipe-count" class="muted" aria-live="polite"></p>'+
     link('Что есть дома?','recipes/pantry',{symbol:'bowl'})+'</div><div id="recipe-results" class="cards"></div>';
 }
-export function catalogResults(state,recipes,filters) {
+export function catalogMatches(state,recipes,filters) {
   const clean = value => value.toLocaleLowerCase('ru').replace(/ё/g,'е');
   const query=clean(filters.query.trim());
-  const matches=recipes.filter(recipe=>
+  return recipes.filter(recipe=>
     (!query || clean([recipe.name,recipe.description,...recipe.ingredients.map(item=>item.name)].join(' ')).includes(query)) &&
     (!filters.category || recipe.category===filters.category) && (!filters.difficulty || recipe.difficulty===+filters.difficulty) &&
     (!filters.time || totalTime(recipe)<=+filters.time) && (!filters.status || statusFor(state,recipe.id)===filters.status) &&
-    (!filters.favorite || state.favorites.includes(recipe.id)));
+    (!filters.favorite || state.favorites.includes(recipe.id)) && matchesQuickFilters(recipe,filters));
+}
+export function catalogResults(state,recipes,filters) {
+  const matches=catalogMatches(state,recipes,filters);
+  const quickCount=Object.keys(quickFilterLabels).filter(key=>filters[key]).length;
+  document.querySelector('[data-quick-count]').textContent=quickCount?' · '+quickCount:'';
   document.querySelector('#recipe-count').textContent='Найдено: '+matches.length;
   document.querySelector('#recipe-results').innerHTML=matches.length?matches.map(recipe=>card(recipe,state)).join(''):empty('Ничего не найдено','Попробуйте изменить поиск или фильтры.');
 }
@@ -100,6 +133,10 @@ export function cookPage(state,reportDraft,ai=null) {
   if (session.reporting) return reportPage({id:session.id,name:session.recipe.name,minutes:Math.round(duration(session)/60000)},reportDraft,true);
   const {recipe,step:index,done,servings}=session;
   const step=recipe.steps[index];
+  const preparation=preparationTasks(recipe);
+  const prepDone=new Set(session.prepDone??[]);
+  const prepCount=preparation.filter(task=>prepDone.has(task.id)).length;
+  const personalNote=stepNote(state,recipe,index);
   const previous=ordered(state.history.filter(entry=>entry.recipeId===recipe.id))[0];
   const currentFood=scaled(recipe.ingredients,servings,recipe.servings).filter(item=>step.ingredients.includes(item.id));
   const timers=step.timers.map((timer,i)=>{
@@ -111,11 +148,17 @@ export function cookPage(state,reportDraft,ai=null) {
     heading(recipe.name,servings+' порций · '+done.length+' из '+recipe.steps.length+' шагов отмечено',
       button(session.activeSince===null?'Продолжить':'Пауза готовки','cook-pause',{symbol:session.activeSince===null?'arrow':'pause'}))+
     (session.activeSince===null?'<div class="info">Готовка на паузе. Уже запущенные таймеры продолжают отсчёт.</div>':'')+
+    '<details class="panel prep-checklist" '+(index===0 && prepCount<preparation.length?'open':'')+'><summary>Перед готовкой <small data-prep-count>'+
+    prepCount+' / '+preparation.length+'</small></summary><div class="prep-items">'+
+    preparation.map(task=>'<label><input type="checkbox" data-prep-task="'+task.id+'" '+(prepDone.has(task.id)?'checked':'')+
+      '><span>'+h(task.text)+(task.detail?'<small>'+h(task.detail)+'</small>':'')+'</span></label>').join('')+'</div></details>'+
     (ai?.beforeCooking(recipe.id,true)??'')+
     '<div class="step-nav" aria-label="Шаги">'+recipe.steps.map((_,i)=>button(String(i+1)+(done.includes(i)?' ✓':''),'cook-step',{id:i,kind:i===index?'primary':''})).join('')+'</div>'+
     '<div class="cook-layout"><section class="panel cook-step padded"><div class="kicker">Шаг '+(index+1)+' из '+recipe.steps.length+'</div><h2>'+h(step.title)+'</h2>'+(ai?.stepAdvice(recipe.id,index)??'')+'<p class="instruction">'+h(step.instruction)+'</p>'+
     (step.temperature?'<div class="info">'+h(step.temperature)+'</div>':'')+(step.ready?'<div class="note"><strong>Как понять, что готово</strong><p>'+h(step.ready)+'</p></div>':'')+
     (step.parallel?'<div class="note"><strong>Параллельно</strong><p>'+h(step.parallel)+'</p></div>':'')+
+    '<div class="step-personal-note">'+(personalNote?'<div class="note"><strong>Моя заметка</strong><p>'+h(personalNote)+'</p></div>':'')+
+    button(personalNote?'Изменить заметку':'Добавить заметку','step-note',{symbol:'edit',kind:'quiet'})+'</div>'+
     (ai?.questionButton()?'<div class="step-ai-actions">'+ai.questionButton()+'</div>':'')+(timers?'<h3>Таймеры шага</h3><div class="timer-list">'+timers+'</div>':'')+'</section>'+
     '<aside class="panel padded"><h3>Продукты на этом шаге</h3>'+(currentFood.length?foodList(currentFood):'<p class="muted">Без дополнительных продуктов.</p>')+
     (notes(previous)?'<h3>Из прошлой попытки</h3>'+notes(previous):'')+'</aside></div>'+
@@ -126,10 +169,12 @@ export function cookPage(state,reportDraft,ai=null) {
 }
 
 const impressionLabel = entry => entry.pending?'Оценка отложена':ratingLabel(entry.rating);
-export function reportPage(entry,draft,legacy=false) {
+export function reportPage(entry,draft,legacy=false,reminder=null,canRemind=false) {
   const values={...entry,...draft};
   const later=legacy?button('Оценить позже','report-defer',{id:entry.id}):link(entry.pending?'Оценить позже':'В историю','history/'+entry.recipeId,{kind:'quiet'});
   return heading(!legacy&&!entry.pending?'Редактировать отзыв':'Как получилось?',entry.name,later)+
+    (entry.pending && canRemind?'<div class="info review-reminder">'+(reminder?'<p>Напоминание · '+
+      h(dateLabel(reminder.at))+'</p>':'')+button(reminder?'Изменить напоминание':'Напомнить об отзыве','review-reminder',{id:entry.id,symbol:'time'})+'</div>':'')+
     '<form class="panel padded form-stack" id="report-form" data-entry="'+h(entry.id)+'"><div class="form-grid">'+
     field('Затрачено, минут',input('minutes',values.minutes,'type="number" min="0" max="1000000" required'))+
     field('Приготовили бы ещё раз?',select('again',[['','Без ответа'],['yes','Да'],['no','Нет']],values.again??''))+'</div>'+
@@ -156,10 +201,15 @@ function shoppingGroups(items) {
 export function shoppingPage(state) {
   const sections=shoppingSections(state);
   const atHome=sections.flatMap(section=>section.items.filter(item=>item.state==='home').map(item=>({...item,group:section.name})));
-  const count=sections.flatMap(section=>section.items).filter(item=>item.state==='todo').length;
+  const totals=shoppingTotals(sections);
+  const count=totals.length;
   return heading('Покупки',sections.length?'Осталось купить: '+count:'Добавьте продукты из рецепта или внесите свои.',
     button('Добавить продукт','shop-add',{kind:'primary',symbol:'plus'})+button('Копировать','shop-copy',{disabled:!sections.length}))+
     (!sections.length?empty('Список пока пуст','Откройте рецепт и добавьте продукты в покупки.',link('К рецептам','recipes',{kind:'primary'})):
+    (sections.length>1 && count?'<section class="panel padded shopping-summary"><h2>Общий итог покупок</h2>'+
+      totals.map(item=>'<details><summary><span>'+h(item.name)+'</span><strong>'+h(amount(item))+'</strong></summary><ul>'+
+        item.parts.map(part=>'<li><span>'+h(part.name)+(part.servings?' · Порций: '+part.servings:'')+'</span><strong>'+
+          h(amount(part))+'</strong></li>').join('')+'</ul></details>').join('')+'</section>':'')+
     sections.map(section=>'<section class="panel padded shopping-group"><div class="section-heading"><div><h2>'+h(section.name)+'</h2>'+
       (section.id?'<p class="muted">Порций: '+section.servings+'</p>':'<p class="muted">Отдельные продукты</p>')+'</div>'+
       (section.id?button('Удалить блюдо','shop-batch-delete',{id:section.id,kind:'quiet danger'}):'')+'</div>'+
@@ -168,7 +218,7 @@ export function shoppingPage(state) {
 }
 
 export const goalLabels = {monthly:'Приготовлений за месяц',new:'Новых блюд за месяц',retry:'Повторить неудачные блюда'};
-export function historyPage(state,recipeId,period,ai=null,findRecipe) {
+export function historyPage(state,recipeId,period,ai=null,findRecipe,canRemind=false) {
   const history=ordered(state.history);
   const entries=recipeId?history.filter(item=>item.recipeId===recipeId):history;
   const pending=entries.filter(entry=>entry.pending);
@@ -191,7 +241,9 @@ export function historyPage(state,recipeId,period,ai=null,findRecipe) {
     link(entry.pending?'Оценить':'Править','impression/'+entry.id,{kind:entry.pending?'primary':'entry-footer-link',symbol:'edit'})+
     (recipeId?'':link('Все попытки','history/'+entry.recipeId,{kind:'entry-footer-link',symbol:'arrow'}))+
     '<details class="recipe-add-menu entry-menu"><summary class="btn" aria-label="Действия с записью">⋯</summary>'+
-    '<div class="panel recipe-add-actions">'+button('Удалить запись','history-delete',{id:entry.id,kind:'danger'})+
+    '<div class="panel recipe-add-actions">'+(entry.pending && canRemind?
+      button(state.reviewReminders?.some(reminder=>reminder.entryId===entry.id)?'Изменить напоминание':'Напомнить об отзыве','review-reminder',{id:entry.id,symbol:'time'}):'')+
+    button('Удалить запись','history-delete',{id:entry.id,kind:'danger'})+
     '</div></details></div></div></article>').join('')+'</div>':
     empty('Записей пока нет','Завершите готовку и сохраните первый результат.',link('К рецептам','recipes',{kind:'primary'})))+'</section>';
 }

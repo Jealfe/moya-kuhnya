@@ -613,6 +613,46 @@
                 }
               ]
             },
+            "planServings": {
+              "type": "array",
+              "maxItems": 2000,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "recipeId": {"type":"string","minLength":1,"maxLength":80,"pattern":"^[a-z0-9][a-z0-9_-]*$"},
+                  "servings": {"type":"integer","minimum":1,"maximum":100}
+                },
+                "required": ["recipeId","servings"],
+                "additionalProperties": false
+              }
+            },
+            "stepNotes": {
+              "type": "array",
+              "maxItems": 20000,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "recipeId": {"type":"string","minLength":1,"maxLength":80,"pattern":"^[a-z0-9][a-z0-9_-]*$"},
+                  "stepKey": {"type":"string","minLength":1,"maxLength":2521},
+                  "text": {"type":"string","minLength":1,"maxLength":1200}
+                },
+                "required": ["recipeId","stepKey","text"],
+                "additionalProperties": false
+              }
+            },
+            "reviewReminders": {
+              "type": "array",
+              "maxItems": 50000,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "entryId": {"type":"string","minLength":1,"maxLength":80,"pattern":"^[a-z0-9][a-z0-9_-]*$"},
+                  "at": {"type":"integer","minimum":1,"maximum":8640000000000000}
+                },
+                "required": ["entryId","at"],
+                "additionalProperties": false
+              }
+            },
             "shopping": {
               "type": "array",
               "items": {
@@ -1365,6 +1405,12 @@
                       },
                       "minItems": 0,
                       "maxItems": 360
+                    },
+                    "prepDone": {
+                      "type": "array",
+                      "maxItems": 5,
+                      "uniqueItems": true,
+                      "items": {"enum":["ingredients","tools","first-0","first-1","first-2"]}
                     },
                     "reporting": {
                       "type": "boolean"

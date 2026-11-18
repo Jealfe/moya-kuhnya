@@ -554,6 +554,44 @@ html {background:var(--bg)}
 .cooking-plan a,.history-recipe-link {color:var(--olive);text-decoration:underline;text-underline-offset:4px}
 .cooking-plan a {padding:10px 0;overflow-wrap:anywhere}
 .cooking-plan a small {display:block;margin-top:3px;color:var(--muted);font-weight:500}
+dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(100%,640px);max-height:88dvh;padding:0;
+  border-radius:var(--radius) var(--radius) 0 0;display:flex;flex-direction:column;overflow:hidden}
+.plan-sheet .dialog-heading {padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}
+.plan-sheet > p,.plan-sheet > a {margin:12px 16px}
+.plan-form {display:flex;flex-direction:column;min-height:0}
+.plan-scroll {padding:12px 16px;overflow:auto;overscroll-behavior:contain}
+.plan-footer {display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.plan-footer .primary {flex:1}
+.plan-sheet .cooking-plan li {display:grid;grid-template-columns:26px minmax(0,1fr) auto}
+.plan-sheet input[type=checkbox],.prep-items input[type=checkbox] {width:20px;height:20px;accent-color:var(--olive)}
+.plan-sheet .cooking-plan .btn {min-height:44px}
+.shopping-summary details {border-top:1px solid var(--line)}
+.shopping-summary summary,.shopping-summary li {display:flex;justify-content:space-between;gap:12px;padding:9px 0}
+.shopping-summary summary {cursor:pointer;align-items:center;min-height:44px}
+.shopping-summary summary::before {content:'▸';color:var(--olive)}
+.shopping-summary details[open] summary::before {content:'▾'}
+.shopping-summary summary span {flex:1}
+.shopping-summary strong {flex:none}
+.shopping-summary ul {margin:0 0 8px;padding:0 0 0 20px;color:var(--muted)}
+.quick-filters summary {min-height:44px;width:max-content;max-width:100%;cursor:pointer}
+.quick-filters summary::after {content:'▾';margin-inline-start:4px}
+.quick-filters[open] summary::after {content:'▴'}
+.quick-filter-options {display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:7px}
+.quick-filter-options label {min-height:44px}
+.prep-checklist {padding:0 14px;margin:0 0 12px}
+.prep-checklist summary {min-height:48px;padding:12px 0;cursor:pointer;font-weight:650}
+.prep-checklist summary small {margin-left:8px;color:var(--muted)}
+.prep-items label {display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:9px 0;border-top:1px solid var(--line)}
+.prep-items input {flex:none}
+.prep-items small {display:block;color:var(--muted);margin-top:3px}
+.step-personal-note {margin-top:12px}
+.step-personal-note p {white-space:pre-wrap;overflow-wrap:anywhere}
+.review-reminder {display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.review-reminder p {margin:0}
+@media(prefers-reduced-motion:no-preference) {
+  dialog.plan-sheet[open] {animation:plan-in .22s ease-out}
+  @keyframes plan-in {from {transform:translateY(34px);opacity:.55}}
+}
 .btn.step-ai-button {
   min-height:48px;margin-top:8px;background:var(--chip);color:var(--ink);
   border-color:var(--olive);box-shadow:0 2px 10px color-mix(in srgb,var(--olive) 16%,transparent)

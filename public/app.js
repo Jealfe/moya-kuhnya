@@ -3,12 +3,13 @@ import { createAi } from './ai-ui.js';
 import { isAndroid } from './native.js';
 import { makeBackup, readBackup } from './backup.js';
 import { createAutoBackup } from './auto-backup.js';
-import { plannedIds, addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { plannedIds, removePlannedRecipe, addPlanShopping, addShoppingBatch, amount, changeTimer, duration, findShoppingList, parseJsonText, parseRecipes, remaining, removeShoppingItem, scaled, sessionFor, shoppingSections, uid } from './core.js';
+import { preparationTasks, reminderTime, stepNote, stepNoteKey } from './cooking-extras.js';
 import { openStorage } from './storage.js';
 import { createPantry, pantryMode } from './pantry-ui.js';
 import { addInboxRecipes, readRecipeInbox } from './inbox.js';
 import { area, button, clock, dateLabel, empty, field, foodList, h, icon, input, link, photo, readJson, readPhoto, saveFile, select } from './ui.js';
-import { catalog, catalogResults, cookPage, goalLabels, historyPage, home, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
+import { catalog, catalogMatches, catalogResults, cookPage, dishCount, goalLabels, historyPage, home, planSheet, planShoppingLabel, recipePage, reportPage, settingsPage, shoppingPage, timerCard } from './pages.js';
 import { captureDraft, editor, groups, newRecipe, updateDraft } from './editor.js';
 
 document.documentElement.dataset.platform=isAndroid()?'android':'web';
@@ -21,7 +22,7 @@ const pantryDialog=document.querySelector('#pantry-dialog');
 const notice=document.querySelector('#notice');
 const routes=[['home','Главная'],['recipes','Рецепты'],['shopping','Покупки'],['history','История'],['settings','Настройки']];
 const recipeBase='./data/recipes/';
-const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false};
+const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false,quick20:false,noOven:false,onePan:false};
 const filters={...defaultFilters};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
@@ -35,6 +36,10 @@ let timerNotificationStatus=null;
 function timerPlugin() {
   return isAndroid()?globalThis.Capacitor?.Plugins?.KitchenTimers:null;
 }
+const reviewReminderFor = id => state.reviewReminders?.find(item=>item.entryId===id);
+function removeReviewReminder(current,id) {
+  current.reviewReminders=(current.reviewReminders??[]).filter(item=>item.entryId!==id);
+}
 
 async function syncTimerNotifications() {
   const plugin=timerPlugin();
@@ -43,6 +48,10 @@ async function syncTimerNotifications() {
   const timers=(session?.reporting?[]:session?.timers??[]).filter(timer=>timer.end!==null).map(timer=>({
     key:session.id+':'+timer.id,end:timer.end,name:timer.name,recipe:session.recipe.name,sound:state.settings.sound
   }));
+  const pending=new Map(state.history.filter(entry=>entry.pending).map(entry=>[entry.id,entry]));
+  for (const {entryId,at} of state.reviewReminders??[]) {
+    if (pending.has(entryId)) timers.push({key:'review:'+entryId,end:at,review:entryId,recipe:pending.get(entryId).name});
+  }
   try {
     timerNotificationStatus=await plugin.sync({timers});
   } catch {
@@ -91,9 +100,35 @@ function say(message,undo=false) {
   if (undo) notice.insertAdjacentHTML('beforeend',button('Отменить','shop-batch-undo',{kind:'quiet'}));
   noticeTimeout=setTimeout(()=>{notice.textContent='';},undo?10000:5500);
 }
-function showDialog(title,content) {
+function showDialog(title,content,{sheet=false}={}) {
+  dialog.classList.toggle('plan-sheet',sheet);
   dialog.innerHTML='<div class="dialog-heading"><h2 id="dialog-title">'+h(title)+'</h2>'+button('Закрыть','dialog-close',{kind:'quiet',symbol:'close'})+'</div>'+content;
   if (!dialog.open) dialog.showModal();
+}
+const planRecipes = () => {
+  const recipes=new Map(catalogItems().map(recipe=>[recipe.id,recipe]));
+  return plannedIds(state).map(id=>recipes.get(id)).filter(Boolean);
+};
+function showPlan(selected) {
+  showDialog('План готовки',planSheet(state,planRecipes(),selected),{sheet:true});
+}
+
+function showReviewReminder(id) {
+  const entry=state.history.find(item=>item.id===id && item.pending);
+  if (!entry || !timerPlugin()) return;
+  const reminder=reviewReminderFor(id);
+  const tomorrow=new Date(reminder?.at??Date.now()+3600000);
+  const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  showDialog('Напомнить об отзыве','<p>'+h(entry.name)+'</p>'+
+    '<form id="review-reminder-form" class="form-stack" data-entry="'+h(id)+'">'+
+    (reminder?'<p class="muted">Сейчас: '+h(dateLabel(reminder.at))+'</p>':'')+
+    field('Когда напомнить',select('when',[['hour','Через час'],['tomorrow','Завтра в 19:00'],['custom','Своё время']],reminder?'custom':'hour'))+
+    '<div data-custom-reminder '+(reminder?'':'hidden')+'>'+
+    field('Дата и время',input('at',local,'type="datetime-local" '+(reminder?'required':'disabled')))+'</div>'+
+    '<div class="actions"><button class="btn primary">Сохранить напоминание</button>'+
+    (reminder?button('Отменить напоминание','review-reminder-cancel',{id,kind:'quiet danger'}):'')+'</div>'+
+    '<p class="muted" data-reminder-status role="status" hidden></p>'+
+    '<div data-review-settings hidden>'+button('Настройки уведомлений Android','timer-notification-settings')+'</div></form>');
 }
 function confirmAction(title,message,label,action,id='') {
   showDialog(title,'<p>'+h(message)+'</p><div class="actions">'+button(label,action,{id,kind:'primary'})+button('Отмена','dialog-close')+'</div>');
@@ -152,11 +187,11 @@ function render({focus=false}={}) {
     case 'cook': main.innerHTML=cookPage(state,drafts['report/'+state.session?.id],ai); break;
     case 'impression': {
       const entry=state.history.find(item=>item.id===id);
-      main.innerHTML=entry?reportPage(entry,drafts['report/'+id]):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
+      main.innerHTML=entry?reportPage(entry,drafts['report/'+id],false,reviewReminderFor(id),Boolean(timerPlugin())):empty('Запись недоступна','Откройте историю готовок.',link('В историю','history',{kind:'primary'}));
       break;
     }
     case 'shopping': main.innerHTML=shoppingPage(state); break;
-    case 'history': main.innerHTML=historyPage(state,id,period,ai,findRecipe); break;
+    case 'history': main.innerHTML=historyPage(state,id,period,ai,findRecipe,Boolean(timerPlugin())); break;
     case 'settings':
       main.innerHTML=settingsPage(state,{
         section:id,offline:isAndroid()?'Встроенные рецепты доступны без интернета.':offlineReady?'Офлайн-доступ готов.':'Офлайн-доступ готовится.',
@@ -175,12 +210,16 @@ function render({focus=false}={}) {
 
 function onRoute() {
   const [page,id]=route();
+  if (dialog.open && dialog.classList.contains('plan-sheet')) dialog.close();
   if (page!=='editor') {draft=null; draftKey=null;}
   const wasOpen=pantryDialog.open;
   const mode=page==='recipes'?pantryMode(id):null;
   if (!mode) pantry.show(null);
   render({focus:true});
-  if (mode) pantry.show(mode,catalogItems());
+  if (mode) {
+    const recipes=catalogItems();
+    pantry.show(mode,recipes,catalogMatches(state,recipes,filters));
+  }
   else if (wasOpen && page==='recipes') main.querySelector('.catalog-options a').focus();
 }
 function chooseFeatured(previous) {
@@ -392,7 +431,7 @@ async function finishCooking(pending=true,report={}) {
     if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
     current.history.push(entry);
     updateAutomaticStatus(current,entry.recipeId);
-    current.planned=plannedIds(current).filter(id=>id!==entry.recipeId);
+    removePlannedRecipe(current,entry.recipeId);
     current.session=null;
   },{backup:true});
   return entry;
@@ -489,12 +528,25 @@ async function onAction(action,id) {
       render();
       main.querySelector('#filters input[name="query"]').focus();
       return;
+    case 'open-plan': showPlan(); return;
+    case 'plan-sheet-remove': {
+      const selected=new Set(new FormData(dialog.querySelector('#plan-shopping-form')).getAll('recipe'));
+      await change(current=>removePlannedRecipe(current,id));
+      render();
+      showPlan(selected);
+      return;
+    }
     case 'plan': {
+      if (!recipe || !plannedIds(state).includes(id) && !validPortions(id)) return;
       let added;
       await change(current=>{
         const ids=plannedIds(current);
         added=!ids.includes(id);
-        current.planned=added?[...ids,id]:ids.filter(item=>item!==id);
+        if (added) {
+          if (ids.length>=2000) throw Error('В плане уже 2000 блюд. Уберите ненужные.');
+          current.planned=[...ids,id];
+          current.planServings=[...(current.planServings??[]),{recipeId:id,servings:getPortions(recipe)}];
+        } else removePlannedRecipe(current,id);
       });
       say(added?'Добавлено в план':'Убрано из плана');
       break;
@@ -588,6 +640,17 @@ async function onAction(action,id) {
     }
     case 'cook-step': await changeSession(session=>{session.step=Math.max(0,Math.min(session.recipe.steps.length-1,+id));}); render({focus:true}); return;
     case 'cook-check': await changeSession(session=>{session.done=session.done.includes(session.step)?session.done.filter(i=>i!==session.step):[...session.done,session.step];}); break;
+    case 'step-note': {
+      const session=state.session;
+      if (!session || session.reporting) return;
+      const note=stepNote(state,session.recipe,session.step);
+      showDialog('Моя заметка к шагу','<form id="step-note-form" class="form-stack" data-session="'+h(session.id)+
+        '" data-step="'+session.step+'"><p>'+h(session.recipe.steps[session.step].title)+'</p>'+
+        field('Заметка',area('note',note,'rows="4" maxlength="1200"'))+
+        '<div class="actions"><button class="btn primary">Сохранить заметку</button>'+
+        (note?'<button class="btn quiet danger" name="remove" value="yes">Удалить заметку</button>':'')+'</div></form>');
+      return;
+    }
     case 'cook-pause':
       await changeSession(session=>{
         const now=Date.now();
@@ -607,6 +670,12 @@ async function onAction(action,id) {
       return;
     }
     case 'report-back': await changeSession(session=>{session.reporting=false; session.activeSince=Date.now();}); break;
+    case 'review-reminder': showReviewReminder(id); return;
+    case 'review-reminder-cancel':
+      await change(current=>removeReviewReminder(current,id),{backup:true});
+      dialog.close();
+      say('Напоминание отменено');
+      break;
     case 'cook-cancel': confirmAction('Отменить готовку?','Шаги и таймеры этой попытки будут удалены.','Отменить готовку','cook-discard'); return;
     case 'cook-discard': await changeSession((session,current)=>{current.session=null;}); dialog.close(); navigate('home'); return;
     case 'history-delete': {
@@ -630,6 +699,7 @@ async function onAction(action,id) {
         const index=current.history.findIndex(entry=>entry.id===id);
         if (index!==-1) {
           const [entry]=current.history.splice(index,1);
+        removeReviewReminder(current,entry.id);
           current.aiAnalyses=(current.aiAnalyses??[]).filter(item=>item.entryId!==entry.id);
           const status=current.statuses.find(item=>item.id===entry.recipeId);
           if (reset && status?.automatic===undefined && ['tried','repeat'].includes(status?.status) &&
@@ -726,6 +796,22 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   const target=event.target;
+  const planForm=target.closest('#plan-shopping-form');
+  if (planForm && target.name==='recipe') {
+    const submit=planForm.querySelector('[data-plan-submit]');
+    const count=new FormData(planForm).getAll('recipe').length;
+    submit.disabled=!count;
+    submit.textContent=planShoppingLabel(count);
+    return;
+  }
+  const reminderForm=target.closest('#review-reminder-form');
+  if (reminderForm && target.name==='when') {
+    const custom=target.value==='custom';
+    reminderForm.querySelector('[data-custom-reminder]').hidden=!custom;
+    reminderForm.elements.at.disabled=!custom;
+    reminderForm.elements.at.required=custom;
+    return;
+  }
   if (target.name==='ai-model') {
     const custom=target.form.elements['ai-custom-model'];
     const visible=!target.value;
@@ -735,8 +821,29 @@ document.addEventListener('change',event=>{
     if (visible) custom.focus();
     return;
   }
+  if (working && target.hasAttribute('data-prep-task')) {
+    target.checked=state.session?.prepDone?.includes(target.dataset.prepTask)??false;
+    return;
+  }
   void run(async()=>{
-    if (target.name==='recipe-status') {
+    if (target.hasAttribute('data-prep-task')) {
+      const id=target.dataset.prepTask;
+      const checked=target.checked;
+      try {
+        await changeSession(session=>{
+          const selected=new Set(session.prepDone??[]);
+          if (checked) selected.add(id); else selected.delete(id);
+          session.prepDone=[...selected];
+        });
+      } finally {
+        if (target.isConnected && state.session) {
+          const tasks=preparationTasks(state.session.recipe);
+          const done=new Set(state.session.prepDone??[]);
+          target.checked=done.has(id);
+          main.querySelector('[data-prep-count]').textContent=tasks.filter(task=>done.has(task.id)).length+' / '+tasks.length;
+        }
+      }
+    } else if (target.name==='recipe-status') {
       await change(current=>{current.statuses=[...current.statuses.filter(item=>item.id!==target.dataset.id),{id:target.dataset.id,status:target.value,automatic:false}];});
       say('Статус сохранён');
     } else if (target.dataset.item) {
@@ -758,6 +865,57 @@ document.addEventListener('submit',event=>{
   const data=new FormData(form);
   void run(async()=>{
     switch(form.getAttribute('id')) {
+      case 'plan-shopping-form': {
+        let count=0;
+        const selected=new Set(data.getAll('recipe'));
+        if (!selected.size) return;
+        const recipes=planRecipes();
+        await change(current=>{count=addPlanShopping(current,recipes,selected);});
+        dialog.close();
+        say(count?'В покупки добавлено: '+dishCount(count):'Выбранные блюда уже в покупках.');
+        navigate('shopping');
+        return;
+      }
+      case 'step-note-form': {
+        const session=state.session;
+        const index=Number(form.dataset.step);
+        if (!session || session.id!==form.dataset.session || !session.recipe.steps[index]) throw Error('Этот шаг больше недоступен.');
+        const note={recipeId:session.recipe.id,stepKey:stepNoteKey(session.recipe,index),text:event.submitter?.name==='remove'?'':data.get('note').trim()};
+        await change(current=>{
+          if (current.session?.id!==session.id) throw Error('Эта готовка уже изменилась.');
+          const notes=(current.stepNotes??[]).filter(item=>item.recipeId!==note.recipeId || item.stepKey!==note.stepKey);
+          if (note.text && notes.length>=20000) throw Error('Достигнут предел в 20 000 заметок.');
+          current.stepNotes=note.text?[...notes,note]:notes;
+        },{backup:true});
+        break;
+      }
+      case 'review-reminder-form': {
+        const id=form.dataset.entry;
+        const plugin=timerPlugin();
+        if (!plugin) return;
+        const status=form.querySelector('[data-reminder-status]');
+        let at;
+        try {at=reminderTime(data.get('when'),data.get('at'));} catch(error) {
+          status.hidden=false;
+          status.textContent=error.message;
+          return;
+        }
+        const permission=await plugin.requestNotifications();
+        if (!permission.enabled || permission.reviewAvailable===false) {
+          status.hidden=false;
+          status.textContent='Разрешите уведомления об отзывах в настройках Android и нажмите «Сохранить» ещё раз.';
+          form.querySelector('[data-review-settings]').hidden=false;
+          return;
+        }
+        await change(current=>{
+          if (!current.history.some(entry=>entry.id===id && entry.pending)) throw Error('Эта попытка уже оценена или удалена.');
+          removeReviewReminder(current,id);
+          current.reviewReminders.push({entryId:id,at});
+        },{backup:true});
+        say(!timerNotificationStatus?'Время сохранено. Android пока не подтвердил постановку уведомления.':
+          timerNotificationStatus.exact?'Напоминание сохранено · '+dateLabel(at):'Напоминание сохранено. Android может доставить его позже выбранного времени.');
+        break;
+      }
       case 'editor-form': {
         const key=draftKey;
         const saved=structuredClone(captureDraft(form,draft));
@@ -862,6 +1020,7 @@ document.addEventListener('submit',event=>{
           Object.assign(entry,report);
           if (image) entry.image=image;
           delete entry.pending;
+          removeReviewReminder(current,id);
           recipeId=entry.recipeId;
           updateAutomaticStatus(current,recipeId);
         },{backup:true});
@@ -940,6 +1099,13 @@ try {
   chooseFeatured(lastFeatured);
   await Promise.all([ai.initialize(aiSchema),autoBackup.initialize()]);
   await syncTimerNotifications();
+  const notifications=timerPlugin();
+  if (notifications?.addListener) await notifications.addListener('reviewOpen',({id})=>{
+    const entry=state.history.find(item=>item.id===id && item.pending);
+    if (!entry) {say('Эта попытка уже оценена или удалена.');return;}
+    if (dialog.open) dialog.close();
+    navigate('impression/'+id);
+  });
   syncSystemBars();
   onRoute();
   tick();

@@ -104,6 +104,18 @@ export function parseBackup(value,schema,legacySchema) {
   }
   const items = shoppingSections(data).flatMap(section=>section.items);
   if (new Set(items.map(item=>item.id)).size !== items.length) errors.push('$.data.shoppingBatches — повторяются ID продуктов');
+  const planned=new Set(plannedIds(data));
+  const servingIds=(data.planServings??[]).map(item=>item.recipeId);
+  if (new Set(servingIds).size!==servingIds.length || servingIds.some(id=>!planned.has(id))) {
+    errors.push('$.data.planServings — порции должны соответствовать блюдам в плане');
+  }
+  const noteKeys=(data.stepNotes??[]).map(note=>JSON.stringify([note.recipeId,note.stepKey]));
+  if (new Set(noteKeys).size!==noteKeys.length) errors.push('$.data.stepNotes — повторяются заметки к шагу');
+  const pending=new Set(data.history.filter(entry=>entry.pending).map(entry=>entry.id));
+  const reminders=(data.reviewReminders??[]).map(item=>item.entryId);
+  if (new Set(reminders).size!==reminders.length || reminders.some(id=>!pending.has(id))) {
+    errors.push('$.data.reviewReminders — напоминания должны соответствовать попыткам без оценки');
+  }
   if (data.session) {
     const {recipe,step,done,timers} = data.session;
     errors.push(...recipeLinks(recipe,'$.data.session.recipe'));
@@ -116,6 +128,13 @@ export function parseBackup(value,schema,legacySchema) {
 }
 
 export const plannedIds = state => Array.isArray(state.planned)?state.planned:state.planned?[state.planned]:[];
+export const plannedServings = (state,recipe) =>
+  state.planServings?.find(item=>item.recipeId===recipe.id)?.servings??recipe.servings;
+
+export function removePlannedRecipe(state,id) {
+  state.planned=plannedIds(state).filter(recipeId=>recipeId!==id);
+  state.planServings=(state.planServings??[]).filter(item=>item.recipeId!==id);
+}
 
 export const scaled = (ingredients, servings, original) =>
   ingredients.map(item => ({...item,quantity:item.quantity*servings/original}));
@@ -153,6 +172,30 @@ export function addShoppingBatch(state, recipe, servings, makeId=uid) {
 export function shoppingSections(state) {
   const standalone = state.shopping.length ? [{name:'Общий список',items:state.shopping}] : [];
   return [...state.shoppingBatches,...standalone];
+}
+export function addPlanShopping(state,recipes,selected,makeId=uid) {
+  const existing=new Set(state.shoppingBatches.map(batch=>batch.recipeId));
+  const planned=new Set(plannedIds(state));
+  const dishes=recipes.filter(recipe=>selected.has(recipe.id) && planned.has(recipe.id) && !existing.has(recipe.id));
+  if (state.shoppingBatches.length+dishes.length>1000) throw Error('В покупках уже слишком много блюд. Удалите ненужные.');
+  for (const recipe of dishes) addShoppingBatch(state,recipe,plannedServings(state,recipe),makeId);
+  return dishes.length;
+}
+
+export function shoppingTotals(sections) {
+  const totals=new Map();
+  for (const section of sections) {
+    for (const original of section.items) {
+      if (original.state!=='todo') continue;
+      const item=convert(original);
+      const key=JSON.stringify([clean(item.name),clean(item.unit)]);
+      if (!totals.has(key)) totals.set(key,{...item,quantity:0,parts:[]});
+      const total=totals.get(key);
+      total.quantity+=item.quantity;
+      total.parts.push({name:section.name,servings:section.servings,quantity:item.quantity,unit:item.unit});
+    }
+  }
+  return [...totals.values()].sort((a,b)=>a.name.localeCompare(b.name,'ru'));
 }
 export function findShoppingList(state,id) {
   return shoppingSections(state).find(section=>section.items.some(item=>item.id===id))?.items;

@@ -25,16 +25,33 @@ import org.json.JSONObject
 private const val prefsName = "kitchen_timers"
 private const val loudChannel = "cooking_timers"
 private const val quietChannel = "cooking_timers_silent"
+private const val reviewChannel = "cooking_reviews"
+private const val reviewScheme = "kitchen-review"
 
 private fun alarmIntent(context: Context, key: String) =
     Intent(context, KitchenTimerReceiver::class.java).setData(Uri.Builder().scheme("kitchen-timer").authority("end").appendPath(key).build())
+
+private fun canSchedulePrecisely(alarms: AlarmManager) =
+    Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()
+
+private fun scheduleAlarm(alarms: AlarmManager, end: Long, pending: PendingIntent) {
+    if (canSchedulePrecisely(alarms)) {
+        try {
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, end, pending)
+            return
+        } catch (_: SecurityException) {
+            // Android can revoke exact alarm access between the check and scheduling.
+        }
+    }
+    alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, end, pending)
+}
 
 @CapacitorPlugin(name = "KitchenTimers", permissions = [
     Permission(alias = "notifications", strings = [Manifest.permission.POST_NOTIFICATIONS])
 ])
 class KitchenTimersPlugin : Plugin() {
     private val alarms get() = context.getSystemService(AlarmManager::class.java)
-    private fun exact() = Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()
+    private fun exact() = canSchedulePrecisely(alarms)
 
     private fun statusObject(): JSObject {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -44,6 +61,15 @@ class KitchenTimersPlugin : Plugin() {
         return JSObject().put("enabled", enabled).put("exact", exact())
             .put("soundAvailable", enabled && available(loudChannel))
             .put("silentAvailable", enabled && available(quietChannel))
+            .put("reviewAvailable", enabled && available(reviewChannel))
+    }
+
+    override fun handleOnNewIntent(intent: Intent) {
+        val data = intent.data ?: return
+        if (data.scheme != reviewScheme || data.authority != "open") return
+        val id = data.lastPathSegment ?: return
+        if (!Regex("^[a-z0-9][a-z0-9_-]{0,79}$").matches(id)) return
+        notifyListeners("reviewOpen", JSObject().put("id", id), true)
     }
 
     @PluginMethod
@@ -94,17 +120,10 @@ class KitchenTimersPlugin : Plugin() {
             val intent = alarmIntent(context, key)
             val existing = PendingIntent.getBroadcast(context, 0, intent, flags or PendingIntent.FLAG_NO_CREATE)
             if (existing != null && token == records.getString(key, null)) continue
+            if (timer.has("review")) manager.cancel(key, 0)
             records.edit().putString(key, token).apply()
             val pending = PendingIntent.getBroadcast(context, 0, intent.putExtra("end", end), flags or PendingIntent.FLAG_UPDATE_CURRENT)
-            if (precise) {
-                try {
-                    alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, end, pending)
-                    continue
-                } catch (_: SecurityException) {
-                    // Special access can change between the check and scheduling.
-                }
-            }
-            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, end, pending)
+            scheduleAlarm(alarms, end, pending)
         }
         for (key in records.all.keys - keys) {
             val pending = PendingIntent.getBroadcast(context, 0, alarmIntent(context, key), flags or PendingIntent.FLAG_NO_CREATE)
@@ -125,34 +144,57 @@ class KitchenTimerReceiver : BroadcastReceiver() {
         val records = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         val record = records.getString(key, null)?.let(::JSONObject) ?: return
         val end = record.getLong("end")
-        if (end != intent.getLongExtra("end", -1) || end > System.currentTimeMillis()) return
-        records.edit().remove(key).apply()
+        if (record.optBoolean("delivered") || end != intent.getLongExtra("end", -1) || end > System.currentTimeMillis()) return
+        val review = record.optString("review")
+        if (review.isEmpty()) records.edit().remove(key).apply()
+        else records.edit().putString(key, record.put("delivered", true).toString()).apply()
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
 
-        val sound = record.optBoolean("sound", true)
-        val channel = if (sound) loudChannel else quietChannel
+        val isReview = review.isNotEmpty()
+        val sound = !isReview && record.optBoolean("sound", true)
+        val channel = if (isReview) reviewChannel else if (sound) loudChannel else quietChannel
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
-            val name = if (sound) "Таймеры готовки" else "Таймеры без звука"
-            val category = NotificationChannel(channel, name, NotificationManager.IMPORTANCE_HIGH)
-            if (!sound) {
+            val name = if (isReview) "Отзывы о готовке" else if (sound) "Таймеры готовки" else "Таймеры без звука"
+            val importance = if (isReview) NotificationManager.IMPORTANCE_DEFAULT else NotificationManager.IMPORTANCE_HIGH
+            val category = NotificationChannel(channel, name, importance)
+            if (!isReview && !sound) {
                 category.setSound(null, null)
                 category.enableVibration(false)
             }
             manager.createNotificationChannel(category)
         }
         val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (isReview) open.data = Uri.Builder().scheme(reviewScheme).authority("open").appendPath(review).build()
         val click = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(record.getString("recipe"))
-            .setContentText("Таймер завершён · " + record.getString("name"))
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentText(if (isReview) "Попробовали блюдо? Запишите впечатления." else "Таймер завершён · " + record.getString("name"))
+            .setCategory(if (isReview) NotificationCompat.CATEGORY_REMINDER else NotificationCompat.CATEGORY_ALARM)
+            .setPriority(if (isReview) NotificationCompat.PRIORITY_DEFAULT else NotificationCompat.PRIORITY_HIGH)
             .setDefaults(if (sound) NotificationCompat.DEFAULT_SOUND else 0)
             .setContentIntent(click)
             .setAutoCancel(true)
             .build()
         try { manager.notify(key, 0, notification) } catch (_: SecurityException) { }
+    }
+}
+
+class KitchenReviewRestoreReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        val records = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        val alarms = context.getSystemService(AlarmManager::class.java)
+        for ((key, value) in records.all) {
+            if (!key.startsWith("review:") || value !is String) continue
+            val record = JSONObject(value)
+            if (record.optBoolean("delivered")) continue
+            val end = record.getLong("end")
+            val alarm = alarmIntent(context, key).putExtra("end", end)
+            val pending = PendingIntent.getBroadcast(context, 0, alarm,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            scheduleAlarm(alarms, maxOf(end, System.currentTimeMillis()), pending)
+        }
     }
 }

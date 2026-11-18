@@ -174,21 +174,21 @@ export function createPantry(dialog,storage,initialPantry,onSaved) {
 
   return {
     restore(saved) { ({products,useBasics}=saved);resultsScroll=0; },
-    show(next,recipes) {
+    show(next,recipes,eligible=recipes) {
       if (!next) {
         if (dialog.open) dialog.close();
         mode=null;
         return;
       }
       mode=next;
+      currentRecipes=eligible;
       if (mode==='edit') {
-        currentRecipes=recipes;
         catalog=productCatalog(recipes);
       }
       dialog.innerHTML='<div class="dialog-heading"><h2 id="pantry-title" tabindex="-1">'+
         (mode==='edit'?'Что есть дома?':'Подборка рецептов')+
         '</h2><button class="btn quiet" type="button" data-pantry-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
-        (mode==='edit'?editContent():resultContent(recipes,{products,useBasics}));
+        (mode==='edit'?editContent():resultContent(eligible,{products,useBasics}));
       if (mode==='edit') refresh();
       if (!dialog.open) dialog.showModal();
       fitViewport();

@@ -5,7 +5,12 @@ const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROM
 try {
   const page=await browser.newPage({viewport:{width:360,height:780},isMobile:true,hasTouch:true});
   await page.addInitScript(()=>{
-    window.Capacitor={getPlatform:()=> 'android',Plugins:{GigaChat:{
+    const notificationStatus={enabled:true,exact:true,reviewAvailable:true};
+    window.Capacitor={getPlatform:()=> 'android',Plugins:{KitchenTimers:{
+      sync:async({timers})=>{window.pendingNotifications=timers;return notificationStatus;},
+      requestNotifications:async()=>notificationStatus,
+      addListener:async(_event,listener)=>{window.openReview=listener;}
+    },GigaChat:{
       status:async()=>({hasKey:true,model:'GigaChat-2',scope:'GIGACHAT_API_PERS'}),
       explainStep:async({payload})=>{
         window.stepQuestion=payload;
@@ -25,22 +30,48 @@ try {
   const search=page.getByRole('searchbox');
   await search.fill('плов');
   await page.getByLabel('Избранное',{exact:true}).check();
+  await page.locator('.quick-filters > summary').click();
+  const quick=page.getByLabel('До 20 минут',{exact:true});
+  const onePan=page.getByLabel('В одной сковороде',{exact:true});
+  await quick.check();
   await action('reset-filters').click();
   assert.equal(await search.inputValue(),'');
   assert.equal(await page.getByLabel('Избранное',{exact:true}).isChecked(),false);
+  assert.equal(await quick.isChecked(),false);
+  await page.locator('.quick-filters > summary').click();
+  await onePan.check();
+  await search.fill('шакшука');
+  await page.locator('#recipe-results .recipe-card').waitFor();
+  await page.getByRole('link',{name:'Что есть дома?'}).click();
+  await page.getByLabel('Продукты дома').fill('яйцо');
+  await page.getByRole('button',{name:'Смотреть рецепты (1)'}).click();
+  await page.locator('.pantry-result').getByText('Шакшука',{exact:true}).waitFor();
   await go('recipe/pilaf');
+  await page.getByLabel('Порций',{exact:true}).fill('5');
   await action('plan').click();
   await page.getByText('Добавлено в план',{exact:true}).waitFor();
   await go('recipe/syrniki');
   await action('plan').click();
   await page.getByRole('button',{name:'Убрать из плана',exact:true}).waitFor();
   await go('home');
+  await action('open-plan').click();
   assert.equal(await page.locator('.cooking-plan li').count(),2);
   assert.equal(await page.locator('.cooking-plan a small').count(),2);
-  await go('recipe/pilaf');
-  await action('recipe-shop').click();
-  await page.getByText('Блюдо добавлено отдельным списком',{exact:true}).waitFor();
-  await go('shopping');
+  await page.getByText(/Порций: 5/).waitFor();
+  await page.locator('.cooking-plan li').filter({hasText:'Сырники'}).getByRole('checkbox').uncheck();
+  await page.getByRole('button',{name:'Добавить в покупки · 1 блюдо'}).click();
+  await page.locator('.shopping-group h2').first().waitFor();
+  assert.equal(await page.locator('.shopping-group').count(),1);
+  await go('home');
+  await action('open-plan').click();
+  await page.getByText(/Уже в списке/).waitFor();
+  assert.equal(await page.locator('.cooking-plan li').filter({hasText:'Плов'}).getByRole('checkbox').isDisabled(),true);
+  await page.getByRole('button',{name:'Добавить в покупки · 1 блюдо'}).click();
+  await page.getByRole('heading',{name:'Общий итог покупок'}).waitFor();
+  assert.equal(await page.locator('.shopping-group').count(),2);
+  const total=page.locator('.shopping-summary details').filter({has:page.getByText('Соль',{exact:true})});
+  await total.locator('summary').click();
+  assert.equal(await total.locator('li').count(),2);
   const first=page.locator('.shopping-group .shopping-row').first();
   const product=await first.locator('strong').textContent();
   await first.getByRole('button',{name:'Есть дома',exact:true}).click();
@@ -53,6 +84,16 @@ try {
   await page.getByRole('button',{name:'Закрыть',exact:true}).click();
   await go('recipe/pilaf');
   await action('start').click();
+  const prep=page.locator('input[data-prep-task]').first();
+  await prep.check();
+  await page.locator('[data-prep-count]').filter({hasText:/^1 \/ /}).waitFor();
+  await action('step-note').click();
+  await page.getByLabel('Заметка',{exact:true}).fill('На моей плите хватило 7 минут.');
+  await page.getByRole('button',{name:'Сохранить заметку',exact:true}).click();
+  await page.getByText('На моей плите хватило 7 минут.',{exact:true}).waitFor();
+  await page.reload();
+  assert.equal(await prep.isChecked(),true);
+  await page.getByText('На моей плите хватило 7 минут.',{exact:true}).waitFor();
   await page.locator('.step-ai-button').waitFor();
   await action('ai-step-question').click();
   await page.getByLabel('Что непонятно?').fill('Как нарезать?');
@@ -73,11 +114,19 @@ try {
   await page.locator('#timer-dock').waitFor({state:'hidden'});
   await timerRows.first().getByRole('button',{name:'Повторить',exact:true}).waitFor();
   await action('cook-finish').click();
+  await action('review-reminder').click();
+  await page.getByRole('button',{name:'Сохранить напоминание',exact:true}).click();
+  await page.waitForFunction(()=>window.pendingNotifications.some(item=>item.review));
+  const reminder=await page.evaluate(()=>window.pendingNotifications.find(item=>item.review));
+  assert.ok(reminder.end>Date.now());
   await page.getByRole('link',{name:'Оценить позже',exact:true}).click();
-  await page.locator('.entry').getByRole('link',{name:'Оценить',exact:true}).click();
+  await page.locator('.entry').getByRole('link',{name:'Оценить',exact:true}).waitFor();
+  await page.evaluate(id=>window.openReview({id}),reminder.review);
+  await page.waitForURL('**/#/impression/'+reminder.review);
   const note=page.getByLabel('Что получилось хорошо');
   await note.fill('Первая заметка');
   await page.getByRole('button',{name:'Сохранить впечатления'}).click();
+  await page.waitForFunction(()=>!window.pendingNotifications.some(item=>item.review));
   await page.getByRole('link',{name:'Править',exact:true}).click();
   assert.equal(await note.inputValue(),'Первая заметка');
   await note.fill('Заметка исправлена');
@@ -93,6 +142,14 @@ try {
   await page.locator('.history-recipe-link').click();
   await page.waitForURL('**/#/recipe/pilaf');
   await go('home');
+  await action('open-plan').click();
   assert.equal(await page.locator('.cooking-plan li').count(),1);
-  console.log('PASS: reset filters, multiple planned recipes, home shopping, GigaChat step question, deferred and edited review.');
+  await action('dialog-close').click();
+  await go('recipe/pilaf');
+  await action('start').click();
+  await page.getByText('На моей плите хватило 7 минут.',{exact:true}).waitFor();
+  await action('step-note').click();
+  await page.getByRole('button',{name:'Удалить заметку',exact:true}).click();
+  await page.getByRole('button',{name:'Добавить заметку',exact:true}).waitFor();
+  console.log('PASS: quick filters with pantry, bottom plan sheet, shopping totals, prep checklist, persistent step notes, and review reminder navigation and cancellation.');
 } finally {await browser.close();}
