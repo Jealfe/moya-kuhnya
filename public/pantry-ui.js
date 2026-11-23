@@ -1,6 +1,6 @@
 
 import { matchRecipes, productCatalog, productKey, quickProducts, splitProducts, suggestProducts, updateProducts } from './pantry.js';
-import { area, h, icon } from './ui.js';
+import { area, closeControl, h, icon } from './ui.js';
 
 const editRoute='recipes/pantry';
 const resultsRoute='recipes/pantry-results';
@@ -51,7 +51,7 @@ function resultContent(recipes,{products,useBasics}) {
     '</div><div class="pantry-footer"><button class="btn primary" type="button" data-pantry-edit>Изменить список</button></div></div>';
 }
 
-export function createPantry(dialog,storage,initialPantry) {
+export function createPantry(dialog,storage,initialPantry,onSaved) {
   let {products,useBasics}=initialPantry;
   let mode=null, catalog, currentRecipes, busy=false, resultsScroll=0;
   const get = selector => dialog.querySelector(selector);
@@ -78,10 +78,10 @@ export function createPantry(dialog,storage,initialPantry) {
   }
 
   function preview() {
-    const pending=splitProducts(input().value,catalog).filter(name=>catalog.has(productKey(name)));
+    const pending=splitProducts(input().value,catalog);
     const matches=matchRecipes(currentRecipes,[...products,...pending],{useBasics});
     const panel=get('[data-pantry-preview]');
-    panel.hidden=!products.length && !pending.length;
+    panel.hidden=!products.length && !matches.length;
     const ready=matches.filter(isReady);
     const partial=matches.filter(match=>!isReady(match));
     panel.innerHTML=matches.length?
@@ -117,6 +117,7 @@ export function createPantry(dialog,storage,initialPantry) {
           add.length?updateProducts(current.products,add,catalog):current.products,
         useBasics:basics??current.useBasics
       })));
+      onSaved();
       resultsScroll=0;
       if (mode==='edit' && input()===currentInput) {
         if (clearInput && currentInput.value===previous) currentInput.value='';
@@ -172,21 +173,22 @@ export function createPantry(dialog,storage,initialPantry) {
   });
 
   return {
-    show(next,recipes) {
+    restore(saved) { ({products,useBasics}=saved);resultsScroll=0; },
+    show(next,recipes,eligible=recipes) {
       if (!next) {
         if (dialog.open) dialog.close();
         mode=null;
         return;
       }
       mode=next;
+      currentRecipes=eligible;
       if (mode==='edit') {
-        currentRecipes=recipes;
         catalog=productCatalog(recipes);
       }
       dialog.innerHTML='<div class="dialog-heading"><h2 id="pantry-title" tabindex="-1">'+
         (mode==='edit'?'Что есть дома?':'Подборка рецептов')+
-        '</h2><button class="btn quiet" type="button" data-pantry-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
-        (mode==='edit'?editContent():resultContent(recipes,{products,useBasics}));
+        '</h2>'+closeControl('data-pantry-close')+'</div>'+
+        (mode==='edit'?editContent():resultContent(eligible,{products,useBasics}));
       if (mode==='edit') refresh();
       if (!dialog.open) dialog.showModal();
       fitViewport();

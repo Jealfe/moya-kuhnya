@@ -1,0 +1,19 @@
+{
+  "appId": "ru.jealfe.moyakuhnya",
+  "appName": "Моя кухня",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "loggingBehavior": "none",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "contain"
+    }
+  }
+}

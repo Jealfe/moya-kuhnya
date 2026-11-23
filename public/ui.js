@@ -1,3 +1,4 @@
+import { isAndroid, nativePlugin } from './native.js';
 import { amount, formatNumber, totalTime } from './core.js';
 
 export const h = value => String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -17,21 +18,33 @@ const paths = {
   heart:'M20 5a5 5 0 0 0-8 1 5 5 0 0 0-8-1c-2 2-2 5 0 7l8 8 8-8c2-2 2-5 0-7z',
   spark:'M12 2l2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8z',
   plus:'M12 4v16M4 12h16',
+  minus:'M5 12h14',
+  reset:'M5 4v6h6M5 10a8 8 0 1 1 0 6',
+  copy:'M9 9h11v11H9zM15 9V4H4v11h5',
+  camera:'M3 7h5l2-3h4l2 3h5v13H3zM12 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
   download:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   upload:'M12 15V3m-5 5 5-5 5 5M4 17v4h16v-4',
   check:'m4 12 5 5L20 6',
   search:'M10 4a6 6 0 1 0 .01 0M15 15l5 5',
+  filters:'M4 6h16M4 12h16M4 18h16M10 3v6m5 0v6m-8 0v6',
   bowl:'M3 12h18a9 9 0 0 1-18 0zm5 9h8M8 8c-2-2 1-3 0-5m5 5c-2-2 1-3 0-5',
   trend:'m3 16 6-6 4 4 7-8m-5 0h5v5',
   star:'m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.4-5.7-3-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z',
   close:'m5 5 14 14M19 5 5 19',
+  edit:'m4 16-1 5 5-1L20 8l-4-4L4 16m10-10 4 4',
   pause:'M9 4v16m6-16v16'
 };
 export const icon = name => '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[name]+'"/></svg>';
-export const button = (label,action,{id='',kind='',symbol='',disabled=false}={}) =>
-  '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'" '+(disabled?'disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
+export const button = (label,action,{id='',kind='',symbol='',disabled=false,ariaLabel=''}={}) =>
+  '<button type="button" class="btn '+kind+'" data-do="'+action+'" data-id="'+h(id)+'"'+
+  (ariaLabel?' aria-label="'+h(ariaLabel)+'"':'')+(disabled?' disabled':'')+'>'+(symbol?icon(symbol):'')+h(label)+'</button>';
 export const link = (label,route,{kind='',symbol=''}={}) =>
   '<a class="btn '+kind+'" href="#/'+route+'">'+(symbol?icon(symbol):'')+h(label)+'</a>';
+export const closeControl = attrs =>
+  '<button type="button" class="btn inline-action close-action" aria-label="Закрыть" '+attrs+'>'+icon('close')+'</button>';
+export const actionMenu = (label,actions,kind='') =>
+  '<details class="recipe-add-menu '+kind+'"><summary class="btn" aria-label="'+h(label)+'">⋯</summary>'+
+  '<div class="panel recipe-add-actions">'+actions+'</div></details>';
 export const options = (entries,selected) => entries.map(([value,label]) =>
   '<option value="'+h(value)+'"'+(String(selected)===String(value)?' selected':'')+'>'+h(label)+'</option>').join('');
 export const field = (label,body) => '<label class="field"><span>'+h(label)+'</span>'+body+'</label>';
@@ -88,8 +101,17 @@ export const foodList = items => '<ul class="ingredients">'+items.map(item=>'<li
 export const stat = (label,value,symbol) => '<div class="stat panel"><span class="stat-icon">'+icon(symbol)+'</span><div><strong>'+h(value)+'</strong><span>'+h(label)+'</span></div></div>';
 export const ratingLabel = rating => rating ? formatNumber(rating)+' / 5' : 'Без оценки';
 export const clock = seconds => [Math.floor(seconds/60),seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
-export function saveFile(name,value) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
+export async function saveFile(name,value,{maxMb,share=false}={}) {
+  const content=JSON.stringify(value);
+  const blob=new Blob([content],{type:'application/json'});
+  if (maxMb && blob.size>maxMb*1024*1024) throw Error('Копия больше '+maxMb+' МБ. Уменьшите объём фото, чтобы её можно было восстановить.');
+  if (isAndroid()) {
+    const files=nativePlugin('KitchenFiles');
+    if (share) {await files.share({name,content});return false;}
+    const result=await files.save({name,content});
+    return result.saved===true;
+  }
+  const url = URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url; a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);

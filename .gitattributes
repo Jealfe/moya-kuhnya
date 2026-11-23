@@ -1,0 +1,2 @@
+# Preserve the official certificate's CRLF representation; its DER fingerprint is documented.
+*.pem -text whitespace=cr-at-eol
