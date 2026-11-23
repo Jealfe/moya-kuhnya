@@ -53,7 +53,7 @@ export function planSheet(state,recipes,selected) {
     planShoppingLabel(count)+'</button><a class="btn inline-action" href="#/shopping">К покупкам'+icon('arrow')+'</a></div></form>';
 }
 
-export const quickFilterLabels = {quick20:'До 20 минут',noOven:'Без духовки',onePan:'В одной сковороде'};
+export const quickFilterLabels = {quick20:'До 20 минут',noOven:'Без духовки',onePan:'В одной сковороде',cookedYes:'Готовил',cookedNo:'Не готовил'};
 export function catalog(recipes,filters,checkingGitHub) {
   const categories=[...new Set(recipes.map(recipe=>recipe.category))];
   const quickCount=Object.keys(quickFilterLabels).filter(key=>filters[key]).length;
@@ -80,11 +80,14 @@ export function catalog(recipes,filters,checkingGitHub) {
 export function catalogMatches(state,recipes,filters) {
   const clean = value => value.toLocaleLowerCase('ru').replace(/ё/g,'е');
   const query=clean(filters.query.trim());
+  const cooked=new Set(state.history.map(entry=>entry.recipeId));
   return recipes.filter(recipe=>
     (!query || clean([recipe.name,recipe.description,...recipe.ingredients.map(item=>item.name)].join(' ')).includes(query)) &&
     (!filters.category || recipe.category===filters.category) && (!filters.difficulty || recipe.difficulty===+filters.difficulty) &&
     (!filters.time || totalTime(recipe)<=+filters.time) && (!filters.status || statusFor(state,recipe.id)===filters.status) &&
-    (!filters.favorite || state.favorites.includes(recipe.id)) && matchesQuickFilters(recipe,filters));
+    (!filters.favorite || state.favorites.includes(recipe.id)) &&
+    (!filters.cookedYes || cooked.has(recipe.id)) && (!filters.cookedNo || !cooked.has(recipe.id)) &&
+    matchesQuickFilters(recipe,filters));
 }
 export function catalogResults(state,recipes,filters) {
   const matches=catalogMatches(state,recipes,filters);
@@ -193,7 +196,9 @@ export function reportPage(entry,draft,legacy=false,reminder=null,canRemind=fals
     field('Затрачено, минут',input('minutes',values.minutes,'type="number" min="0" max="1000000" required'))+
     field('Приготовили бы ещё раз?',select('again',[['','Без ответа'],['yes','Да'],['no','Нет']],values.again??''))+'</div>'+
     '<fieldset class="rating"><legend>Оценка результата</legend>'+[1,2,3,4,5].map(n=>'<label title="'+n+' из 5"><input type="radio" name="rating" value="'+n+'" aria-label="'+n+' из 5" '+(+values.rating===n?'checked':'')+'>'+icon('star')+'</label>').join('')+'</fieldset>'+
-    field('Фото блюда',input('image','','type="file" accept="image/jpeg,image/png,image/webp"'))+
+    '<div class="review-photo-actions">'+button('Снять фото','report-camera',{symbol:'camera'})+
+    '<input name="camera" type="file" accept="image/*" capture="environment" hidden>'+
+    field('Из галереи',input('image','','type="file" accept="image/jpeg,image/png,image/webp"'))+'</div>'+
     '<p class="muted draft-photo" '+(values.image?'':'hidden')+'>'+h(values.image?.name??'Фото сохранено')+'</p>'+
     field('Что получилось хорошо',area('good',values.good??'','maxlength="2400"'))+field('Что пошло не так',area('errors',values.errors??'','maxlength="2400"'))+
     field('Что изменить в следующий раз',area('next',values.next??'','maxlength="2400"'))+

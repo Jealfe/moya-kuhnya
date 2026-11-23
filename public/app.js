@@ -22,7 +22,7 @@ const pantryDialog=document.querySelector('#pantry-dialog');
 const notice=document.querySelector('#notice');
 const routes=[['home','Главная'],['recipes','Рецепты'],['shopping','Покупки'],['history','История'],['settings','Настройки']];
 const recipeBase='./data/recipes/';
-const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false,quick20:false,noOven:false,onePan:false};
+const defaultFilters={query:'',category:'',difficulty:'',time:'',status:'',favorite:false,quick20:false,noOven:false,onePan:false,cookedYes:false,cookedNo:false};
 const filters={...defaultFilters};
 const portions=new Map();
 let state, storage, builtins, recipeSchema, exchange, featuredId;
@@ -86,7 +86,7 @@ function persistDraft(key,value) {
 function saveReportDraft(form) {
   const key='report/'+form.dataset.entry;
   const {minutes,again,rating,good,errors,next}=Object.fromEntries(new FormData(form));
-  const image=form.elements.image.files[0] || drafts[key]?.image;
+  const image=form.elements.camera.files[0] || form.elements.image.files[0] || drafts[key]?.image;
   persistDraft(key,{minutes,again,rating,good,errors,next,image:image?.size<=35*1024*1024?image:undefined});
   const label=form.querySelector('.draft-photo');
   if (image?.size) {
@@ -209,14 +209,26 @@ function render({focus=false}={}) {
   }
 }
 
+let catalogScroll=0;
+let previousPage='';
+if ('scrollRestoration' in history) history.scrollRestoration='manual';
+addEventListener('scroll',()=>{
+  if (previousPage==='recipes' && route()[0]==='recipes' && !route()[1]) catalogScroll=scrollY;
+},{passive:true});
 function onRoute() {
   const [page,id]=route();
+  const returning=page==='recipes' && !id && previousPage==='recipe';
+  previousPage=page;
   if (dialog.open && dialog.classList.contains('plan-sheet')) dialog.close();
   if (page!=='editor') {draft=null; draftKey=null;}
   const wasOpen=pantryDialog.open;
   const mode=page==='recipes'?pantryMode(id):null;
   if (!mode) pantry.show(null);
   render({focus:true});
+  if (returning) {
+    const y=catalogScroll;
+    requestAnimationFrame(()=>{if (route()[0]==='recipes' && !route()[1]) window.scrollTo({top:y,behavior:'instant'});});
+  }
   if (mode) {
     const recipes=catalogItems();
     pantry.show(mode,recipes,catalogMatches(state,recipes,filters));
@@ -432,11 +444,23 @@ async function finishCooking(pending=true,report={}) {
     if (current.history.some(item=>item.id===entry.id)) throw Error('Эта готовка уже записана.');
     if (current.history.length>=50000) throw Error('В истории уже 50 000 записей.');
     current.history.push(entry);
+    current.shoppingBatches=current.shoppingBatches.filter(batch=>batch.recipeId!==entry.recipeId ||
+      batch.items.some(item=>item.state==='todo'));
     updateAutomaticStatus(current,entry.recipeId);
     removePlannedRecipe(current,entry.recipeId);
     current.session=null;
   },{backup:true});
   return entry;
+}
+
+function offerShoppingCleanup(itemId) {
+  const section=shoppingSections(state).find(section=>section.items.some(item=>item.id===itemId));
+  if (!section || !section.items.length || section.items.some(item=>item.state==='todo')) return;
+  const id=section.id??'standalone';
+  showDialog('Все продукты собраны','<p>'+h(section.name)+'. Всё куплено или уже есть дома.</p>'+
+    '<p>Убрать этот список из покупок?</p><div class="actions">'+
+    button('Убрать из покупок','shop-complete-clear',{id,kind:'primary'})+
+    button(section.id?'Оставить до готовки':'Оставить','dialog-close',{kind:'inline-action'})+'</div>');
 }
 
 async function startCooking(id,replace=false) {
@@ -491,6 +515,21 @@ async function onAction(action,id) {
     return;
   }
   switch(action) {
+    case 'report-camera': document.querySelector('#report-form input[name="camera"]')?.click(); return;
+    case 'shop-complete-clear':
+      await change(current=>{
+        if (id==='standalone') {
+          if (current.shopping.some(item=>item.state==='todo')) throw Error('В списке снова есть продукты для покупки.');
+          current.shopping=[];
+        } else {
+          const batch=current.shoppingBatches.find(item=>item.id===id);
+          if (batch?.items.some(item=>item.state==='todo')) throw Error('В списке снова есть продукты для покупки.');
+          current.shoppingBatches=current.shoppingBatches.filter(item=>item.id!==id);
+        }
+      });
+      dialog.close();
+      say('Собранный список убран из покупок');
+      break;
     case 'dialog-close': dialog.close(); return;
     case 'editor-reset':
       confirmAction('Сбросить черновик?','Несохранённые правки будут удалены.','Сбросить','editor-reset-confirm');
@@ -631,7 +670,9 @@ async function onAction(action,id) {
         const item=findShoppingList(current,id)?.find(item=>item.id===id);
         if (item) item.state=item.state==='home'?'todo':'home';
       });
-      break;
+      render();
+      offerShoppingCleanup(id);
+      return;
     case 'shop-copy': {
       const list=shoppingSections(state).map(section=>[section.name+(section.id?' (порций: '+section.servings+')':''),
         ...section.items.map(item=>(item.state==='bought'?'✓ ':item.state==='home'?'Есть дома · ':'• ')+item.name+' — '+amount(item))
@@ -736,6 +777,7 @@ async function run(work) {
 }
 
 document.addEventListener('click',event=>{
+  if (route()[0]==='recipes' && !route()[1] && event.target.closest('#recipe-results a')) catalogScroll=scrollY;
   for (const menu of document.querySelectorAll('.recipe-add-menu[open],.quick-filters[open]')) {
     if (!menu.contains(event.target)) menu.open=false;
   }
@@ -779,8 +821,22 @@ document.addEventListener('input',event=>{
     }
   }
   const report=target.closest('#report-form');
-  if (report) saveReportDraft(report);
+  if (report) {
+    if (target.type==='file' && target.files[0]) {
+      const other=report.elements[target.name==='camera'?'image':'camera'];
+      other.value='';
+    }
+    saveReportDraft(report);
+  }
   if (target.closest('#filters')) {
+    if (target.name==='cookedYes' && target.checked) {
+      filters.cookedNo=false;
+      target.form.elements.cookedNo.checked=false;
+    }
+    if (target.name==='cookedNo' && target.checked) {
+      filters.cookedYes=false;
+      target.form.elements.cookedYes.checked=false;
+    }
     filters[target.name]=target.type==='checkbox'?target.checked:target.value;
     catalogResults(state,catalogItems(),filters);
   }
@@ -851,6 +907,7 @@ document.addEventListener('change',event=>{
     } else if (target.dataset.item) {
       await change(current=>{const item=findShoppingList(current,target.dataset.item)?.find(item=>item.id===target.dataset.item); if(item) item.state=target.checked?'bought':'todo';});
       render();
+      offerShoppingCleanup(target.dataset.item);
     } else if (['theme','sound','wake'].includes(target.name)) {
       await change(current=>{current.settings[target.name]=target.type==='checkbox'?target.checked:target.value;});
       if (target.name==='sound') unlockSound();
@@ -1009,7 +1066,7 @@ document.addEventListener('submit',event=>{
       case 'report-form': {
         const id=form.dataset.entry;
         const key='report/'+id;
-        const image=await readPhoto(form.elements.image.files[0] || drafts[key]?.image);
+        const image=await readPhoto(form.elements.camera.files[0] || form.elements.image.files[0] || drafts[key]?.image);
         const report={minutes:+data.get('minutes'),rating:+data.get('rating'),
           good:data.get('good').trim(),errors:data.get('errors').trim(),next:data.get('next').trim(),again:data.get('again')};
         let recipeId;

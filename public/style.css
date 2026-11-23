@@ -592,6 +592,8 @@ dialog.plan-sheet[open] {position:fixed;inset:auto 0 0;margin:0 auto;width:min(1
 .quick-filter-options {display:grid;position:absolute;inset:calc(100% + 6px) auto auto 0;z-index:5;width:215px;padding:10px 12px 5px}
 .quick-filter-options>strong {padding-block:3px 5px}
 .quick-filter-options .toggle {min-height:44px}
+.review-photo-actions {display:grid;gap:10px}
+.review-photo-actions>.btn {justify-self:start}
 .prep-checklist {padding:0 14px;margin:0 0 12px}
 .prep-checklist summary {min-height:48px;padding:12px 0;cursor:pointer;font-weight:650}
 .prep-checklist summary small {margin-left:8px;color:var(--muted)}

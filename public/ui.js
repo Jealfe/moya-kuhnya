@@ -21,6 +21,7 @@ const paths = {
   minus:'M5 12h14',
   reset:'M5 4v6h6M5 10a8 8 0 1 1 0 6',
   copy:'M9 9h11v11H9zM15 9V4H4v11h5',
+  camera:'M3 7h5l2-3h4l2 3h5v13H3zM12 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
   download:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   upload:'M12 15V3m-5 5 5-5 5 5M4 17v4h16v-4',
   check:'m4 12 5 5L20 6',
