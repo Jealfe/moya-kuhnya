@@ -12,7 +12,7 @@
       "prep": 10,
       "cook": 15,
       "servings": 4,
-      "image": "dish:0",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -157,7 +157,7 @@
       "prep": 12,
       "cook": 35,
       "servings": 4,
-      "image": "dish:1",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -313,7 +313,7 @@
       "prep": 15,
       "cook": 5,
       "servings": 4,
-      "image": "dish:2",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -464,7 +464,7 @@
       "prep": 15,
       "cook": 55,
       "servings": 4,
-      "image": "dish:3",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -631,7 +631,7 @@
       "prep": 15,
       "cook": 35,
       "servings": 4,
-      "image": "dish:4",
+      "image": "dish:12",
       "ingredients": [
         {
           "id": "i1",
@@ -809,7 +809,7 @@
       "prep": 20,
       "cook": 55,
       "servings": 4,
-      "image": "dish:5",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -998,7 +998,7 @@
       "prep": 10,
       "cook": 35,
       "servings": 4,
-      "image": "dish:6",
+      "image": "dish:2",
       "ingredients": [
         {
           "id": "i1",
@@ -1154,7 +1154,7 @@
       "prep": 20,
       "cook": 30,
       "servings": 4,
-      "image": "dish:7",
+      "image": "dish:39",
       "ingredients": [
         {
           "id": "i1",
@@ -1332,7 +1332,7 @@
       "prep": 10,
       "cook": 18,
       "servings": 4,
-      "image": "dish:8",
+      "image": "dish:9",
       "ingredients": [
         {
           "id": "i1",
@@ -1488,7 +1488,7 @@
       "prep": 15,
       "cook": 40,
       "servings": 4,
-      "image": "dish:9",
+      "image": "dish:31",
       "ingredients": [
         {
           "id": "i1",
@@ -1655,7 +1655,7 @@
       "prep": 10,
       "cook": 22,
       "servings": 4,
-      "image": "dish:10",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -1833,7 +1833,7 @@
       "prep": 15,
       "cook": 30,
       "servings": 4,
-      "image": "dish:11",
+      "image": "dish:18",
       "ingredients": [
         {
           "id": "i1",
@@ -2011,7 +2011,7 @@
       "prep": 15,
       "cook": 30,
       "servings": 4,
-      "image": "dish:12",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -2167,7 +2167,7 @@
       "prep": 15,
       "cook": 20,
       "servings": 4,
-      "image": "dish:13",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -2334,7 +2334,7 @@
       "prep": 15,
       "cook": 25,
       "servings": 4,
-      "image": "dish:14",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -2501,7 +2501,7 @@
       "prep": 5,
       "cook": 40,
       "servings": 4,
-      "image": "dish:15",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -2652,7 +2652,7 @@
       "prep": 10,
       "cook": 25,
       "servings": 4,
-      "image": "dish:16",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -2808,7 +2808,7 @@
       "prep": 15,
       "cook": 20,
       "servings": 4,
-      "image": "dish:17",
+      "image": "dish:8",
       "ingredients": [
         {
           "id": "i1",
@@ -2964,7 +2964,7 @@
       "prep": 20,
       "cook": 55,
       "servings": 4,
-      "image": "dish:18",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
@@ -3120,7 +3120,7 @@
       "prep": 15,
       "cook": 25,
       "servings": 4,
-      "image": "dish:19",
+      "image": "",
       "ingredients": [
         {
           "id": "i1",
