@@ -399,8 +399,9 @@ async function checkGitHub() {
       catalogResults(state,catalogItems(),filters);
     }
     const details=[
-      result.added?'Добавлено рецептов: '+result.added:'Новых рецептов нет.',
-      result.existing?'Уже в каталоге: '+result.existing+'.':'',
+      result.added?'Добавлено новых рецептов: '+result.added+'.':'',
+      result.updated?'Обновлено существующих рецептов: '+result.updated+'.':'',
+      !result.added&&!result.updated&&!result.overLimit?'Все рецепты уже актуальны.':'',
       result.overLimit?'Не добавлено из-за лимита каталога: '+result.overLimit+'.':''
     ].filter(Boolean).join(' ');
     if (issues.length && route()[0]==='recipes' && !dialog.open && !pantryDialog.open) {

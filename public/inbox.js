@@ -73,15 +73,42 @@ export async function readRecipeInbox(recipeSchema,bundleSchema,fetchFile=global
   return {recipes,issues};
 }
 
+function comparable(value) {
+  if (Array.isArray(value)) return '['+value.map(comparable).join(',')+']';
+  if (value && typeof value==='object') return '{'+Object.keys(value).sort()
+    .map(key=>JSON.stringify(key)+':'+comparable(value[key])).join(',')+'}';
+  return JSON.stringify(value);
+}
+
 export function addInboxRecipes(state,builtins,recipes) {
-  const known = new Set([...builtins,...state.recipes].map(recipe=>recipe.id));
-  let added=0, existing=0, overLimit=0;
-  for (const recipe of recipes) {
-    if (known.has(recipe.id)) {existing++; continue;}
-    known.add(recipe.id);
-    if (state.recipes.length>=1000) {overLimit++; continue;}
-    state.recipes.push(recipe);
-    added++;
+  const incoming=new Map();
+  for (const recipe of recipes) incoming.set(recipe.id,recipe);
+  const builtinById=new Map(builtins.map(recipe=>[recipe.id,recipe]));
+  const localIndexes=new Map();
+  state.recipes.forEach((recipe,index)=>{
+    const indexes=localIndexes.get(recipe.id)??[];
+    indexes.push(index);
+    localIndexes.set(recipe.id,indexes);
+  });
+
+  let added=0, updated=0, unchanged=0, overLimit=0;
+  for (const [id,recipe] of incoming) {
+    const indexes=localIndexes.get(id)??[];
+    const current=indexes.length?state.recipes[indexes.at(-1)]:builtinById.get(id);
+    if (!current) {
+      if (state.recipes.length>=1000) {overLimit++; continue;}
+      state.recipes.push(recipe);
+      added++;
+      continue;
+    }
+    if (comparable(current)===comparable(recipe)) {unchanged++; continue;}
+    if (indexes.length) {
+      for (const index of indexes) state.recipes[index]=recipe;
+    } else {
+      // An inbox recipe can update a built-in too; state recipes take precedence in the catalog.
+      state.recipes.push(recipe);
+    }
+    updated++;
   }
-  return {added,existing,overLimit};
+  return {added,updated,unchanged,overLimit};
 }

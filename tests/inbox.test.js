@@ -52,15 +52,17 @@ test('неподходящая версия файла не попадает в 
   assert.match(result.issues[0].message,/изменился во время проверки/);
 });
 
-test('повторная проверка не дублирует блюда и не перезаписывает локальные правки',()=>{
+test('повторная проверка обновляет существующие рецепты и не создаёт дубликаты',()=>{
   const state=initialState();
   const originals=[builtin];
   const originalName='Моя версия';
   state.recipes.push({...fresh,name:originalName});
-  const items=[fresh,builtin,{...fresh,id:'one-more'}, {...fresh,id:'one-more'}];
-  assert.deepEqual(addInboxRecipes(state,originals,items),{added:1,existing:3,overLimit:0});
-  assert.deepEqual(addInboxRecipes(state,originals,items),{added:0,existing:4,overLimit:0});
-  assert.equal(state.recipes.find(recipe=>recipe.id===fresh.id).name,originalName);
+  const changedBuiltin={...builtin,description:'Обновлённое описание'};
+  const items=[fresh,changedBuiltin,{...fresh,id:'one-more'}, {...fresh,id:'one-more'}];
+  assert.deepEqual(addInboxRecipes(state,originals,items),{added:1,updated:2,unchanged:0,overLimit:0});
+  assert.equal(state.recipes.find(recipe=>recipe.id===fresh.id).name,fresh.name);
+  assert.equal(state.recipes.find(recipe=>recipe.id===builtin.id).description,changedBuiltin.description);
+  assert.deepEqual(addInboxRecipes(state,originals,items),{added:0,updated:0,unchanged:3,overLimit:0});
 });
 
 test('вставка JSON принимает обычный ответ и кодовый блок из чата',()=>{
