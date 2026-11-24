@@ -57,10 +57,20 @@ test('повторная проверка не дублирует блюда и 
   const originals=[builtin];
   const originalName='Моя версия';
   state.recipes.push({...fresh,name:originalName});
-  const items=[fresh,builtin,{...fresh,id:'one-more'}, {...fresh,id:'one-more'}];
-  assert.deepEqual(addInboxRecipes(state,originals,items),{added:1,existing:3,overLimit:0});
-  assert.deepEqual(addInboxRecipes(state,originals,items),{added:0,existing:4,overLimit:0});
+  const items=[{...fresh,image:''},builtin,{...fresh,id:'one-more'}, {...fresh,id:'one-more'}];
+  assert.deepEqual(addInboxRecipes(state,originals,items),{added:1,existing:3,overLimit:0,imagesUpdated:1});
+  assert.deepEqual(addInboxRecipes(state,originals,items),{added:0,existing:4,overLimit:0,imagesUpdated:0});
   assert.equal(state.recipes.find(recipe=>recipe.id===fresh.id).name,originalName);
+  assert.equal(state.recipes.find(recipe=>recipe.id===fresh.id).image,'');
+});
+
+test('синхронизация изображений сохраняет загруженные пользователем фото',()=>{
+  const state=initialState();
+  const custom='data:image/webp;base64,AAAA';
+  state.recipes.push({...fresh,image:custom});
+  const result=addInboxRecipes(state,[],[{...fresh,image:''}]);
+  assert.equal(result.imagesUpdated,0);
+  assert.equal(state.recipes[0].image,custom);
 });
 
 test('вставка JSON принимает обычный ответ и кодовый блок из чата',()=>{
