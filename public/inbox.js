@@ -74,14 +74,26 @@ export async function readRecipeInbox(recipeSchema,bundleSchema,fetchFile=global
 }
 
 export function addInboxRecipes(state,builtins,recipes) {
-  const known = new Set([...builtins,...state.recipes].map(recipe=>recipe.id));
-  let added=0, existing=0, overLimit=0;
+  const builtinIds = new Set(builtins.map(recipe=>recipe.id));
+  const known = new Set([...builtinIds,...state.recipes.map(recipe=>recipe.id)]);
+  let added=0, existing=0, overLimit=0, imagesUpdated=0;
   for (const recipe of recipes) {
-    if (known.has(recipe.id)) {existing++; continue;}
+    if (known.has(recipe.id)) {
+      existing++;
+      // Keep user-uploaded photos, but synchronize built-in sprite references
+      // (and empty placeholders) from GitHub so corrected inbox images take effect.
+      const saved = builtinIds.has(recipe.id) ? null : state.recipes.find(item=>item.id===recipe.id);
+      if (saved && !String(saved.image ?? '').startsWith('data:image/') &&
+          saved.image !== recipe.image) {
+        saved.image = recipe.image;
+        imagesUpdated++;
+      }
+      continue;
+    }
     known.add(recipe.id);
     if (state.recipes.length>=1000) {overLimit++; continue;}
     state.recipes.push(recipe);
     added++;
   }
-  return {added,existing,overLimit};
+  return {added,existing,overLimit,imagesUpdated};
 }
