@@ -276,7 +276,7 @@ async function checkGitHub() {
   updateGitHubButton();
   try {
     const {recipes,issues}=await readRecipeInbox(recipeSchema,exchange.bundle);
-    let result={added:0,existing:0,overLimit:0};
+    let result={added:0,existing:0,overLimit:0,imagesUpdated:0};
     if (recipes.length) await change(current=>{result=addInboxRecipes(current,builtins,recipes);});
     if (route()[0]==='recipes') {
       catalogResults(state,catalogItems(),filters);
@@ -284,6 +284,7 @@ async function checkGitHub() {
     const details=[
       result.added?'Добавлено рецептов: '+result.added:'Новых рецептов нет.',
       result.existing?'Уже в каталоге: '+result.existing+'.':'',
+      result.imagesUpdated?'Обновлены изображения: '+result.imagesUpdated+'.':'',
       result.overLimit?'Не добавлено из-за лимита каталога: '+result.overLimit+'.':''
     ].filter(Boolean).join(' ');
     if (issues.length && route()[0]==='recipes' && !dialog.open && !pantryDialog.open) {
